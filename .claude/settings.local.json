@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Force; foreach \\($t in 'cmake','g++','gcc','clang++','cl','ninja','git','vcpkg','make','mingw32-make'\\) { $c = Get-Command $t -ErrorAction SilentlyContinue; \"{0}: {1}\" -f $t, $\\(if \\($c\\) { $c.Source } else { '-' }\\) })",
+      "PowerShell(cmake --version)",
+      "PowerShell(g++ --version)",
+      "PowerShell(ninja --version)",
+      "PowerShell(git ls-remote --tags https://github.com/ArthurSonzogni/FTXUI.git)",
+      "PowerShell(cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=\"C:/Users/han2z/gcc/bin/g++.exe\" -DCMAKE_MAKE_PROGRAM=\"C:/Strawberry/c/bin/ninja.exe\" 2>&1)",
+      "PowerShell(cmake --build build 2>&1)",
+      "PowerShell(cmake --preset debug 2>&1)",
+      "PowerShell(cmake --build --preset debug 2>&1)",
+      "PowerShell(git init -q)"
+    ]
+  }
+}
