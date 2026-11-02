@@ -27,22 +27,26 @@ enum Pane { kMonthPane = 0, kDayPane = 1 };
 enum View { kMainView = 0, kOverviewView = 1, kReminderView = 2 };
 
 Element StatusBar(AppState& s, int view, int pane) {
-  std::string hints;
+  std::vector<std::string> hints;
   if (view == kOverviewView)
-    hints = "1 进行中  2 全部  3 已完成  ↑↓/jk 选择  Esc/q/o 返回";
+    hints = {"1 进行中  2 全部  3 已完成  ↑↓/jk 选择  Enter 查看日志  d 删除任务  Esc/q 返回"};
   else if (view == kReminderView)
-    hints = "↑↓/jk 选择  Enter 跳到该日期  Esc/q/m 返回";
+    hints = {"↑↓/jk 选择  Enter 跳到该日期  Esc/q/m 返回"};
   else if (pane == kMonthPane)
-    hints = "方向键/hjkl 选日期  [ ] 翻月  t 今天  Tab 侧边栏  a 事件  n 任务  o 总览  m 提醒  i 节假日  c 国家  r 刷新  v 版本  q 退出";
+    hints = {"移动  方向键/hjkl 选日期   [ ] 翻月   t 今天   Tab 侧边栏",
+             "功能  a 事件  n 任务  o 总览  m 提醒  i 节假日  c 国家  r 刷新  v 版本  q 退出"};
   else
-    hints = "方向键/hjkl 选择  Enter 按下按钮  Tab/Esc 返回月历";
+    hints = {"方向键/hjkl 选择  Enter 按下按钮  Tab/Esc 返回月历"};
 
+  Elements lines;
+  for (const std::string& h : hints) lines.push_back(text(h) | dim);
   auto msg = text(s.message());
   if (s.message_is_error()) msg |= color(Color::Red);
   Element reminder = text("");
   if (const size_t n = s.ActiveReminders(NowLocal()).size(); n > 0)
     reminder = text(" ⏰ 提醒 " + std::to_string(n) + " 条（m 查看） ") | bgcolor(Color::Yellow) | color(Color::Black);
-  return vbox({text(hints) | dim, hbox({msg | flex, reminder})});
+  lines.push_back(hbox({msg | flex, reminder}));
+  return vbox(std::move(lines));
 }
 
 }  // namespace
@@ -61,12 +65,16 @@ App::App(AppState& state, std::function<void()> on_quit)
   auto main_view = Renderer(panes, [month, day] {
     return hbox({month->Render() | flex, day->Render() | size(WIDTH, EQUAL, 44)});
   });
-  auto overview = OverviewScreen(state_);
-  auto reminders = ReminderScreen(state_, [this](Date d) {
-    state_.Select(d);
-    view_ = kMainView;
-    pane_ = kMonthPane;
-  });
+  const auto back_to_main = [this] { view_ = kMainView; };
+  auto overview = OverviewScreen(state_, back_to_main);
+  auto reminders = ReminderScreen(
+      state_,
+      [this](Date d) {
+        state_.Select(d);
+        view_ = kMainView;
+        pane_ = kMonthPane;
+      },
+      back_to_main);
   auto views = Container::Tab({main_view, overview, reminders}, &view_);
 
   root_ = Renderer(views, [this, views] {
@@ -79,13 +87,7 @@ App::App(AppState& state, std::function<void()> on_quit)
       state_.Tick();
       return true;
     }
-    if (view_ != kMainView) {
-      const bool back = e == Event::Escape || e == Event::Character('q') ||
-                        (view_ == kOverviewView && e == Event::Character('o')) ||
-                        (view_ == kReminderView && e == Event::Character('m'));
-      if (back) view_ = kMainView;
-      return back;
-    }
+    if (view_ != kMainView) return false;  // 子界面自行处理按键（含返回）
     if (e == Event::Tab || e == Event::TabReverse) {
       pane_ = pane_ == kMonthPane ? kDayPane : kMonthPane;
       return true;

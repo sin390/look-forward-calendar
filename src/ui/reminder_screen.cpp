@@ -34,13 +34,15 @@ std::string Until(long long minutes) {
 
 class ReminderScreenBase : public ComponentBase {
  public:
-  ReminderScreenBase(AppState& s, std::function<void(Date)> jump_to) : s_(s), jump_to_(std::move(jump_to)) {}
+  ReminderScreenBase(AppState& s, std::function<void(Date)> jump_to, std::function<void()> on_back)
+      : s_(s), jump_to_(std::move(jump_to)), on_back_(std::move(on_back)) {}
 
   bool Focusable() const override { return true; }
 
   bool OnEvent(Event e) override {
-    if (e.is_mouse()) return false;
-    if (e == Event::ArrowDown || e == Event::Character('j')) ++selected_;
+    if (e.is_mouse() || e == Event::Custom) return false;
+    if (e == Event::Escape || e == Event::Character('q') || e == Event::Character('m')) on_back_();
+    else if (e == Event::ArrowDown || e == Event::Character('j')) ++selected_;
     else if (e == Event::ArrowUp || e == Event::Character('k')) --selected_;
     else if (e == Event::Return) {
       const auto list = s_.ActiveReminders(NowLocal());
@@ -93,13 +95,14 @@ class ReminderScreenBase : public ComponentBase {
  private:
   AppState& s_;
   std::function<void(Date)> jump_to_;
+  std::function<void()> on_back_;
   int selected_ = 0;
 };
 
 }  // namespace
 
-Component ReminderScreen(AppState& state, std::function<void(Date)> jump_to) {
-  return Make<ReminderScreenBase>(state, std::move(jump_to));
+Component ReminderScreen(AppState& state, std::function<void(Date)> jump_to, std::function<void()> on_back) {
+  return Make<ReminderScreenBase>(state, std::move(jump_to), std::move(on_back));
 }
 
 }  // namespace cal::ui

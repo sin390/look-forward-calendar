@@ -213,6 +213,55 @@ std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today, const 
   return std::nullopt;
 }
 
+namespace {
+
+// 把 create / modify 中的属性字段描述为 "名称 X，总时长 40:00，……"
+std::string DescribeSpecFields(const Json& f, const char* arrow) {
+  std::vector<std::string> parts;
+  try {
+    if (f.contains("name")) parts.push_back("名称" + std::string(arrow) + f["name"].get<std::string>());
+    if (f.contains("total_minutes"))
+      parts.push_back("总时长" + std::string(arrow) + FormatMinutes(f["total_minutes"].get<int>()));
+    if (f.contains("due")) parts.push_back("截止" + std::string(arrow) + f["due"].get<std::string>());
+    if (f.contains("weekdays")) {
+      std::array<bool, 7> wd{};
+      for (const Json& w : f["weekdays"])
+        if (const int i = w.get<int>(); i >= 1 && i <= 7) wd[static_cast<size_t>(i - 1)] = true;
+      parts.push_back("每周" + std::string(arrow) + WeekdaysText(wd));
+    }
+    if (f.contains("skip_holiday"))
+      parts.push_back(f["skip_holiday"].get<bool>() ? "跳过节假日" : "不跳过节假日");
+    if (f.contains("country")) parts.push_back("节假日国家" + std::string(arrow) + CountryName(f["country"].get<std::string>()));
+  } catch (const nlohmann::json::exception&) {
+    parts.push_back("（字段格式错误）");
+  }
+  std::string s;
+  for (const std::string& p : parts) s += (s.empty() ? "" : "，") + p;
+  return s;
+}
+
+}  // namespace
+
+std::string DescribeLogEntry(const Json& e) {
+  if (!e.is_object()) return "（无法识别的条目）";
+  const std::string op = e.value("op", "");
+  if (op == "create") return "创建：" + DescribeSpecFields(e, " ");
+  if (op == "modify")
+    return "修改：" + (e.contains("fields") ? DescribeSpecFields(e["fields"], " → ") : std::string());
+  if (op == "progress") {
+    const int m = e.value("minutes", 0);
+    const std::string note = e.value("note", "");
+    const std::string date = e.value("date", "");
+    if (m <= 0 && note.empty()) return "清除 " + date + " 的进行记录";
+    return "进行 " + date + "：" + FormatMinutes(m) + (note.empty() ? "" : "，内容：" + note);
+  }
+  if (op == "pause") return "暂停";
+  if (op == "resume") return "恢复";
+  if (op == "complete") return "完成";
+  if (op == "abort") return "中止";
+  return "未知操作：" + op;
+}
+
 std::string WeekdaysText(const std::array<bool, 7>& weekdays) {
   std::string s;
   for (size_t i = 0; i < 7; ++i)

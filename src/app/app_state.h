@@ -73,6 +73,7 @@ class AppState {
   Result ModifyTask(const std::string& id, const TaskSpec& spec);
   Result ChangeTaskStatus(const std::string& id, std::string_view op);  // pause/resume/complete/abort
   Result SetProgress(const std::string& id, Date d, const DayProgress& p);
+  Result DeleteTask(const std::string& id);  // 删除任务文件（全部信息）
 
   // ---- 节假日 ----
   Result ImportHolidays(const fs::path& file, const std::string& country, int year);

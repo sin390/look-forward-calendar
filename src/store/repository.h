@@ -28,6 +28,7 @@ class Repository {
   // 无法解析的文件跳过，并在 warnings 中说明
   std::vector<Task> LoadTasks(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SaveTask(const Task& task) const;
+  std::expected<void, std::string> DeleteTask(const Task& task) const;
 
   HolidayCalendar LoadHolidays(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SaveHolidayYear(const HolidayYear& hy) const;

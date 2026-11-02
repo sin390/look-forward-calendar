@@ -163,6 +163,13 @@ void TestTask() {
   cross.skip_holiday = true;
   CHECK(ValidateSpec(cross, D("2026-11-02"), cal).has_value());
 
+  // 日志描述
+  CHECK(DescribeLogEntry(t2.log.front()).starts_with("创建："));
+  CHECK(DescribeLogEntry(t2.log[1]) == "修改：截止 → 2026-11-30");
+  CHECK(DescribeLogEntry(t.log[1]) == "进行 2026-11-02：1:00");
+  CHECK(DescribeLogEntry(t.log[2]) == "进行 2026-11-02：0:10，内容：写了引言");
+  CHECK(DescribeLogEntry(t2.log[2]) == "暂停");
+
   // 序列化往返
   auto back = TaskFromJson(ToJson(t2), t2.file_stem);
   CHECK(back.has_value());

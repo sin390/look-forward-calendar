@@ -328,6 +328,7 @@ AboutDialog::AboutDialog() {
                separatorLight(),
                paragraph(kCredits),
                text(""),
+               text(std::string("编写模型：") + kModel),
                text("基于 FTXUI 7 与 nlohmann/json，C++23") | dim,
                separatorLight(),
                hbox({filler(), close->Render()}),

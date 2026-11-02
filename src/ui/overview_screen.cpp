@@ -76,22 +76,112 @@ Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays)
 
 class OverviewScreenBase : public ComponentBase {
  public:
-  explicit OverviewScreenBase(AppState& s) : s_(s) {}
+  OverviewScreenBase(AppState& s, std::function<void()> on_back) : s_(s), on_back_(std::move(on_back)) {}
 
   bool Focusable() const override { return true; }
 
   bool OnEvent(Event e) override {
-    if (e.is_mouse()) return false;
-    if (e == Event::Character('1')) SetFilter(kActive);
+    if (e.is_mouse() || e == Event::Custom) return false;
+    const bool back = e == Event::Escape || e == Event::Character('q');
+
+    if (mode_ == kConfirmDelete) {  // 只有 y 确认，其他任意键取消
+      if (e == Event::Character('y')) {
+        const TaskEntry* t = s_.FindTask(target_);
+        const std::string label = t ? t->task.name + " " + IdTag(t->task.id) : target_;
+        Report(s_, s_.DeleteTask(target_), "已删除任务 " + label);
+      } else {
+        s_.Info("已取消删除");
+      }
+      mode_ = kList;
+      return true;
+    }
+
+    if (mode_ == kLog) {
+      if (back || e == Event::Return || e == Event::Character('h') || e == Event::ArrowLeft) mode_ = kList;
+      else if (e == Event::ArrowDown || e == Event::Character('j')) ++log_selected_;
+      else if (e == Event::ArrowUp || e == Event::Character('k')) --log_selected_;
+      else return false;
+      return true;
+    }
+
+    if (back || e == Event::Character('o')) on_back_();
+    else if (e == Event::Character('1')) SetFilter(kActive);
     else if (e == Event::Character('2')) SetFilter(kAll);
     else if (e == Event::Character('3')) SetFilter(kCompleted);
     else if (e == Event::ArrowDown || e == Event::Character('j')) ++selected_;
     else if (e == Event::ArrowUp || e == Event::Character('k')) --selected_;
+    else if (e == Event::Return || e == Event::Character('l') || e == Event::ArrowRight) OpenSelected(kLog);
+    else if (e == Event::Character('d')) OpenSelected(kConfirmDelete);
     else return false;
     return true;
   }
 
   Element OnRender() override {
+    if (mode_ == kLog) {
+      if (const TaskEntry* t = s_.FindTask(target_)) return LogView(*t);
+      mode_ = kList;
+    }
+    Element list_view = ListView();
+    if (mode_ == kConfirmDelete) {
+      if (const TaskEntry* t = s_.FindTask(target_)) return dbox({list_view, ConfirmBox(*t)});
+      mode_ = kList;
+    }
+    return list_view;
+  }
+
+ private:
+  enum Mode { kList, kLog, kConfirmDelete };
+
+  void OpenSelected(Mode mode) {
+    const auto list = Filtered();
+    if (selected_ < 0 || selected_ >= static_cast<int>(list.size())) return;
+    target_ = list[static_cast<size_t>(selected_)]->task.id;
+    log_selected_ = 0;
+    mode_ = mode;
+  }
+
+  static Element ConfirmBox(const TaskEntry& t) {
+    return window(text(" 删除任务 ") | bold | color(Color::Red),
+                  vbox({
+                      text("将删除 " + t.task.name + " " + IdTag(t.task.id) + " 的全部信息"),
+                      text("（任务文件及其全部日志，无法恢复）") | dim,
+                      separatorLight(),
+                      hbox({text("按 "), text(" y ") | inverted, text(" 确认删除，其他任意键取消")}),
+                  })) |
+           clear_under | center;
+  }
+
+  // 任务日志，按时间顺序
+  Element LogView(const TaskEntry& t) {
+    const int n = static_cast<int>(t.task.log.size());
+    log_selected_ = std::clamp(log_selected_, 0, std::max(0, n - 1));
+    Elements rows;
+    for (int i = 0; i < n; ++i) {
+      const Json& entry = t.task.log[static_cast<size_t>(i)];
+      std::string at = entry.is_object() ? entry.value("at", "") : "";
+      std::replace(at.begin(), at.end(), 'T', ' ');
+      auto row = hbox({
+          text(" " + std::to_string(i + 1)) | dim | size(WIDTH, EQUAL, 5),
+          text(at) | color(Color::Cyan) | size(WIDTH, EQUAL, 21),
+          paragraph(DescribeLogEntry(entry)) | flex,
+      });
+      if (i == log_selected_) row = row | inverted | focus;
+      rows.push_back(row);
+    }
+    const TaskSpec& spec = t.state.spec;
+    auto summary = text(" " + StatusText(t.state, t.plan, s_.today()) + "    已做 " +
+                        FormatMinutes(t.state.DoneTotal()) + " / " + FormatMinutes(spec.total_minutes) +
+                        "    截止 " + FormatDate(spec.due) + "    文件 task/" + t.task.file_stem + ".json") |
+                   dim;
+    return Panel("任务日志：" + t.task.name + " " + IdTag(t.task.id) + "（共 " + std::to_string(n) + " 条，按时间顺序）",
+                 vbox({summary, separatorLight(),
+                       hbox({text(" #") | size(WIDTH, EQUAL, 5), text("时间") | size(WIDTH, EQUAL, 21),
+                             text("内容")}) | bold,
+                       separatorLight(), vbox(std::move(rows)) | vscroll_indicator | yframe | flex}),
+                 true);
+  }
+
+  Element ListView() {
     const auto list = Filtered();
     selected_ = std::clamp(selected_, 0, std::max(0, static_cast<int>(list.size()) - 1));
 
@@ -121,7 +211,6 @@ class OverviewScreenBase : public ComponentBase {
                  true);
   }
 
- private:
   void SetFilter(int f) {
     filter_ = f;
     selected_ = 0;
@@ -148,12 +237,18 @@ class OverviewScreenBase : public ComponentBase {
   }
 
   AppState& s_;
+  std::function<void()> on_back_;
+  Mode mode_ = kList;
   int filter_ = kActive;
   int selected_ = 0;
+  std::string target_;  // 日志/删除确认针对的任务 id
+  int log_selected_ = 0;
 };
 
 }  // namespace
 
-Component OverviewScreen(AppState& state) { return Make<OverviewScreenBase>(state); }
+Component OverviewScreen(AppState& state, std::function<void()> on_back) {
+  return Make<OverviewScreenBase>(state, std::move(on_back));
+}
 
 }  // namespace cal::ui

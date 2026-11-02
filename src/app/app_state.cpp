@@ -254,6 +254,16 @@ Result AppState::SetProgress(const std::string& id, Date d, const DayProgress& p
   return CommitTask(*entry, std::move(updated));
 }
 
+Result AppState::DeleteTask(const std::string& id) {
+  const auto it = std::find_if(tasks_.begin(), tasks_.end(),
+                               [&](const TaskEntry& e) { return e.task.id == id; });
+  if (it == tasks_.end()) return std::unexpected("任务不存在");
+  if (auto r = repo_.DeleteTask(it->task); !r) return r;
+  tasks_.erase(it);
+  Touch();
+  return {};
+}
+
 // ---------------------------------------------------------------- 节假日
 
 Result AppState::ImportHolidays(const fs::path& file, const std::string& country, int year) {

@@ -73,6 +73,14 @@ std::expected<void, std::string> Repository::SaveTask(const Task& task) const {
                              ToJson(task).dump(2));
 }
 
+std::expected<void, std::string> Repository::DeleteTask(const Task& task) const {
+  const fs::path p = root_ / "task" / PathFromUtf8(task.file_stem + ".json");
+  std::error_code ec;
+  fs::remove(p, ec);
+  if (ec) return std::unexpected("无法删除文件：" + PathToUtf8(p));
+  return {};
+}
+
 HolidayCalendar Repository::LoadHolidays(std::vector<std::string>& warnings) const {
   HolidayCalendar cal;
   for (const fs::path& p : JsonFilesIn(root_ / "holidays")) {
