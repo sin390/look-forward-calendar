@@ -1,49 +1,62 @@
-// 环境验证用的最小示例：显示当月月历，按 q 退出。
-#include <chrono>
+#include <cstdio>
+#include <sstream>
 #include <string>
 #include <vector>
 
-#include <ftxui/component/component.hpp>
-#include <ftxui/component/screen_interactive.hpp>
-#include <ftxui/dom/elements.hpp>
+#include <ftxui/component/event.hpp>
 
-using namespace ftxui;
-namespace chr = std::chrono;
+#include "app/app_state.h"
+#include "platform/platform.h"
+#include "store/fs_util.h"
+#include "ui/app.h"
 
-int main() {
-  const auto today = chr::year_month_day{
-      chr::floor<chr::days>(chr::system_clock::now())};
-  const auto first = today.year() / today.month() / chr::day{1};
-  const auto last = chr::year_month_day_last{today.year() / today.month() / chr::last};
-  const unsigned offset = chr::weekday{chr::sys_days{first}}.c_encoding();  // 周日=0
+namespace {
 
-  std::vector<Element> rows;
-  std::vector<Element> header;
-  for (auto name : {"日", "一", "二", "三", "四", "五", "六"})
-    header.push_back(text(name) | center | size(WIDTH, EQUAL, 4));
-  rows.push_back(hbox(header) | bold);
-
-  std::vector<Element> week(offset, text("") | size(WIDTH, EQUAL, 4));
-  for (unsigned d = 1; d <= static_cast<unsigned>(last.day()); ++d) {
-    auto cell = text(std::to_string(d)) | center | size(WIDTH, EQUAL, 4);
-    if (d == static_cast<unsigned>(today.day())) cell = cell | inverted;
-    week.push_back(cell);
-    if (week.size() == 7) rows.push_back(hbox(std::move(week))), week.clear();
+// "TAB,DOWN,ENTER,n,ESC" -> 按键序列（开发用快照）
+std::vector<ftxui::Event> ParseKeys(const std::string& spec) {
+  std::vector<ftxui::Event> keys;
+  std::istringstream ss(spec);
+  for (std::string k; std::getline(ss, k, ',');) {
+    if (k == "TAB") keys.push_back(ftxui::Event::Tab);
+    else if (k == "ESC") keys.push_back(ftxui::Event::Escape);
+    else if (k == "ENTER") keys.push_back(ftxui::Event::Return);
+    else if (k == "BS") keys.push_back(ftxui::Event::Backspace);
+    else if (k == "UP") keys.push_back(ftxui::Event::ArrowUp);
+    else if (k == "DOWN") keys.push_back(ftxui::Event::ArrowDown);
+    else if (k == "LEFT") keys.push_back(ftxui::Event::ArrowLeft);
+    else if (k == "RIGHT") keys.push_back(ftxui::Event::ArrowRight);
+    else if (k == "PGUP") keys.push_back(ftxui::Event::PageUp);
+    else if (k == "PGDN") keys.push_back(ftxui::Event::PageDown);
+    else
+      for (char c : k) keys.push_back(ftxui::Event::Character(c));
   }
-  if (!week.empty()) rows.push_back(hbox(std::move(week)));
+  return keys;
+}
 
-  const std::string title = std::to_string(static_cast<int>(today.year())) + " 年 " +
-                            std::to_string(static_cast<unsigned>(today.month())) + " 月";
+}  // namespace
 
-  auto screen = ScreenInteractive::FitComponent();
-  auto ui = Renderer([&] {
-    return vbox({text(title) | bold | center, separator(), vbox(rows),
-                 separator(), text("按 q 退出") | dim | center}) |
-           border;
-  });
-  ui |= CatchEvent([&](Event e) {
-    if (e == Event::Character('q')) return screen.Exit(), true;
-    return false;
-  });
-  screen.Loop(ui);
+// 用法：calendar [--data <数据目录>] [--snapshot <宽>x<高> [按键序列]]
+// 默认数据目录为 exe 所在目录下的 data/
+int main(int argc, char** argv) {
+  cal::InitConsole();
+  cal::fs::path root = cal::ExeDir() / "data";
+  std::string snapshot, keys;
+  for (int i = 1; i < argc; ++i) {
+    const std::string arg = argv[i];
+    if (arg == "--data" && i + 1 < argc) root = argv[++i];
+    else if (arg == "--snapshot" && i + 1 < argc) {
+      snapshot = argv[++i];
+      if (i + 1 < argc && argv[i + 1][0] != '-') keys = argv[++i];
+    }
+  }
+
+  cal::AppState state(root);
+  if (!snapshot.empty()) {
+    int w = 160, h = 45;
+    std::sscanf(snapshot.c_str(), "%dx%d", &w, &h);
+    std::fputs(cal::ui::RenderSnapshot(state, w, h, ParseKeys(keys)).c_str(), stdout);
+    std::fputs("\n", stdout);
+    return 0;
+  }
+  return cal::ui::RunApp(state);
 }

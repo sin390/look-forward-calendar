@@ -1,3 +1,18 @@
+# 构建产物（含 FetchContent 下载的依赖，以及运行时生成的 build/data/）
 build/
+out/
+
+# 编辑器 / 工具生成
 .cache/
+.vscode/
+.idea/
 compile_commands.json
+
+# Claude Code 的本机设置
+.claude/settings.local.json
+
+# 程序运行数据（若在其他位置运行，exe 旁边会生成 data/）
+data/
+
+# 写文件时的临时文件
+*.tmp
