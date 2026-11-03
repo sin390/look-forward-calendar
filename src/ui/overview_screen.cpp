@@ -5,6 +5,7 @@
 #include <ftxui/component/event.hpp>
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/string.hpp>
+#include <ftxui/screen/terminal.hpp>
 
 #include "ui/screens.h"
 #include "ui/widgets.h"
@@ -26,10 +27,18 @@ Color StatusColor(const TaskEntry& e) {
   return Color::Green;
 }
 
-// 表格列宽。名称列按最长名称取宽，但不超过 kNameMaxW，超出部分可横向滚动
-constexpr int kNameMaxW = 32, kIdW = 5, kStatusW = 12, kProgressW = 10, kDoneW = 15, kDateW = 12, kWeekW = 34,
-              kTodayW = 14;
+// 名称列占用其余列剩下的窗口宽度（至少 kNameMinW），名称超出部分可横向滚动；其余列按内容取宽，再加 kColGap 列间距
+// kFrameW：面板左右边框加竖向滚动条
+constexpr int kNameMinW = 8, kColGap = 2, kFrameW = 3;
 constexpr int kNameScrollStep = 4;
+
+// 名称之后的各列：状态、进度、已做/总计、创建、截止、每周、今日目标
+constexpr int kColumns = 7;
+enum Column { kStatusCol, kProgressCol, kDoneCol, kCreatedCol, kDueCol, kWeekCol, kTodayCol };
+constexpr std::array<const char*, kColumns> kHeaders = {N_("Status"), N_("Progress"), N_("Done/Total"), N_("Created"),
+                                                        N_("Due"),    N_("Weekly"),   N_("Today's goal")};
+using RowTexts = std::array<std::string, kColumns>;
+using ColumnWidths = std::array<int, kColumns>;
 
 Element Cell(Element e, int width) { return std::move(e) | size(WIDTH, EQUAL, width); }
 
@@ -44,7 +53,9 @@ std::string SliceCells(const std::vector<std::string>& g, int from, int width) {
   for (int i = std::max(0, from); i < std::min(n, from + width); ++i) {
     const bool cut_tail = i == from + width - 1 && i + 1 < n && g[static_cast<size_t>(i + 1)].empty();
     const std::string& c = g[static_cast<size_t>(i)];
-    out += (c.empty() || cut_tail) ? " " : c;
+    // 空字形是全角字符的后半列：完整字符已占两列，不再输出；只有前半被切掉时补空格
+    if (c.empty()) out += i == from ? " " : "";
+    else out += cut_tail ? " " : c;
   }
   return out;
 }
@@ -57,39 +68,23 @@ Element NameCell(const TaskEntry& e, int width, int offset, bool selected) {
   if (e.plan.overdue) name |= color(Color::Red);
   Elements parts = {name};
   if (ellipsis) parts.push_back(text("…") | dim);
-  return Cell(hbox(std::move(parts)), width);
+  return Cell(hbox(std::move(parts)), width + 1);  // 末尾 1 列间距
 }
 
 // 表头下的分隔线，名称列溢出时在其上叠一条细滚动条
-Element NameScrollBar(int width, int offset, int content_w) {
+Element NameScrollBar(int id_w, int width, int offset, int content_w) {
   if (content_w <= width) return separatorLight();
   const int thumb = std::max(1, width * width / content_w);
   const int pos = offset * (width - thumb) / (content_w - width);
   std::string bar;
   for (int i = 0; i < width; ++i) bar += i >= pos && i < pos + thumb ? "━" : "─";
   // 名称列在 ID 列之后，前面空出 ID 列宽度，露出底下的分隔线
-  return dbox({separatorLight(), hbox({text("") | size(WIDTH, EQUAL, kIdW), text(bar) | dim, filler()})});
+  return dbox({separatorLight(), hbox({text("") | size(WIDTH, EQUAL, id_w), text(bar) | dim, filler()})});
 }
 
-Element HeaderRow(int name_w) {
-  return hbox({
-             Cell(text(" ID"), kIdW),
-             Cell(text(Tr(" Task")), name_w),
-             Cell(text(Tr("Status")), kStatusW),
-             Cell(text(Tr("Progress")), kProgressW),
-             Cell(text(Tr("Done/Total")), kDoneW),
-             Cell(text(Tr("Created")), kDateW),
-             Cell(text(Tr("Due")), kDateW),
-             Cell(text(Tr("Weekly")), kWeekW),
-             Cell(text(Tr("Today's goal")), kTodayW),
-             filler(),
-         }) |
-         bold;
-}
-
-Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays, Element name_cell) {
+// 名称之后各列的文字
+RowTexts CellTexts(const TaskEntry& e, Date today, const HolidayCalendar& holidays) {
   const TaskSpec& spec = e.state.spec;
-  const Color c = StatusColor(e);
   const int done = e.state.DoneTotal();
   const float ratio = spec.total_minutes > 0 ? std::min(1.0f, float(done) / float(spec.total_minutes)) : 0.0f;
 
@@ -101,18 +96,36 @@ Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays,
       today_text = Tr("Off");
   }
 
-  return hbox({
-      Cell(text(" " + e.task.id) | dim, kIdW),
-      std::move(name_cell),
-      Cell(text(StatusText(e.state, e.plan, today)) | color(c), kStatusW),
-      Cell(text(std::to_string(int(ratio * 100 + 0.5f)) + "%") | color(c), kProgressW),
-      Cell(text(FormatMinutes(done) + " / " + FormatMinutes(spec.total_minutes)), kDoneW),
-      Cell(text(FormatDate(e.state.created)), kDateW),
-      Cell(text(FormatDate(spec.due)), kDateW),
-      Cell(text(WeekdaysText(spec.weekdays) + (spec.skip_holiday ? Tr(" skip {config}", {{"config", HolidayConfigShortName(spec.holiday_config)}}) : "")), kWeekW),
-      Cell(text(today_text) | color(Color::Cyan), kTodayW),
-      filler(),
-  });
+  return {
+      StatusText(e.state, e.plan, today),
+      std::to_string(int(ratio * 100 + 0.5f)) + "%",
+      FormatMinutes(done) + " / " + FormatMinutes(spec.total_minutes),
+      FormatDate(e.state.created),
+      FormatDate(spec.due),
+      WeekdaysText(spec.weekdays) +
+          (spec.skip_holiday ? Tr(" skip {config}", {{"config", HolidayConfigShortName(spec.holiday_config)}}) : ""),
+      today_text,
+  };
+}
+
+Element HeaderRow(int id_w, int name_w, const ColumnWidths& widths) {
+  Elements cells = {Cell(text(" ID"), id_w), Cell(text(Tr(" Task")), name_w)};
+  for (int i = 0; i < kColumns; ++i) cells.push_back(Cell(text(Tr(kHeaders[i])), widths[i]));
+  cells.push_back(filler());
+  return hbox(std::move(cells)) | bold;
+}
+
+Element TaskRow(const TaskEntry& e, const RowTexts& texts, int id_w, const ColumnWidths& widths, Element name_cell) {
+  const Color c = StatusColor(e);
+  Elements cells = {Cell(text(" " + e.task.id) | dim, id_w), std::move(name_cell)};
+  for (int i = 0; i < kColumns; ++i) {
+    auto cell = text(texts[i]);
+    if (i == kStatusCol || i == kProgressCol) cell |= color(c);
+    if (i == kTodayCol) cell |= color(Color::Cyan);
+    cells.push_back(Cell(std::move(cell), widths[i]));
+  }
+  cells.push_back(filler());
+  return hbox(std::move(cells));
 }
 
 class OverviewScreenBase : public ComponentBase {
@@ -244,18 +257,35 @@ class OverviewScreenBase : public ComponentBase {
     tabs.push_back(filler());
     tabs.push_back(text(Tr(kSortHint[static_cast<size_t>(filter_)])) | dim);
 
-    // 名称列宽取最长名称，限制在 [表头宽, kNameMaxW]；只有选中行可横向滚动
-    int name_w = string_width(Tr(" Task")) + 1;
-    for (const TaskEntry* e : list) name_w = std::max(name_w, NameWidth(*e) + 1);
-    name_w = std::min(name_w, kNameMaxW);
+    // 名称以外的列宽取表头与内容的最大显示宽度
+    int id_w = string_width(" ID");
+    ColumnWidths widths;
+    for (int i = 0; i < kColumns; ++i) widths[i] = string_width(Tr(kHeaders[i]));
+    std::vector<RowTexts> texts;
+    for (const TaskEntry* e : list) {
+      id_w = std::max(id_w, string_width(" " + e->task.id));
+      texts.push_back(CellTexts(*e, s_.today(), s_.holidays()));
+      for (int i = 0; i < kColumns; ++i) widths[i] = std::max(widths[i], string_width(texts.back()[i]));
+    }
+    id_w += 1;
+    for (int& w : widths) w += kColGap;
+
+    // 名称列可显示宽度 = 窗口宽度减去边框、滚动条和其余列；名称更长时只有选中行可横向滚动
+    int others_w = kFrameW + id_w + 1;  // 名称后留 1 列间距
+    for (int w : widths) others_w += w;
+    int content_w = string_width(Tr(" Task"));
+    for (const TaskEntry* e : list) content_w = std::max(content_w, NameWidth(*e));
+    // 不用 std::clamp：名称都很短（或列表为空）时 content_w 可能小于 kNameMinW，clamp 上下界颠倒是未定义行为
+    const int name_text_w = std::min(content_w, std::max(kNameMinW, Terminal::Size().dimx - others_w));
+    const int name_w = name_text_w + 1;
     const int selected_w = list.empty() ? 0 : NameWidth(*list[static_cast<size_t>(selected_)]);
-    name_offset_ = std::clamp(name_offset_, 0, std::max(0, selected_w - name_w));
+    name_offset_ = std::clamp(name_offset_, 0, std::max(0, selected_w - name_text_w));
 
     Elements rows;
     for (size_t i = 0; i < list.size(); ++i) {
       const bool selected = static_cast<int>(i) == selected_;
-      auto name = NameCell(*list[i], name_w, selected ? name_offset_ : 0, selected);
-      auto row = TaskRow(*list[i], s_.today(), s_.holidays(), std::move(name));
+      auto name = NameCell(*list[i], name_text_w, selected ? name_offset_ : 0, selected);
+      auto row = TaskRow(*list[i], texts[i], id_w, widths, std::move(name));
       // 选中行用浅灰底色而非反色，保留各列原有颜色
       if (selected) row = row | bold | bgcolor(Color::RGB(60, 60, 60)) | focus;
       rows.push_back(row);
@@ -263,8 +293,8 @@ class OverviewScreenBase : public ComponentBase {
     if (rows.empty()) rows.push_back(text(Tr(" No matching tasks")) | dim);
 
     return Panel(Tr("Task overview ({n})", {{"n", std::to_string(list.size())}}),
-                 vbox({hbox(std::move(tabs)), separatorLight(), HeaderRow(name_w),
-                       NameScrollBar(name_w, name_offset_, selected_w),
+                 vbox({hbox(std::move(tabs)), separatorLight(), HeaderRow(id_w, name_w, widths),
+                       NameScrollBar(id_w, name_text_w, name_offset_, selected_w),
                        vbox(std::move(rows)) | vscroll_indicator | yframe | flex}),
                  true);
   }

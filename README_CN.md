@@ -1,4 +1,4 @@
-# LookForward Calendar（LFCalendar）v1.5.1
+# LookForward Calendar（LFCalendar）v1.5.2
 
 [English](README.md) | 中文
 
@@ -23,7 +23,7 @@ LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/
 下载 `LookForward-v<版本>-win64.zip`，解压到任意位置，双击 `LookForward.exe`（或在 Windows Terminal / PowerShell / cmd 中运行）即可，不需要安装。
 
 ```
-LookForward-v1.5.1-win64/
+LookForward-v1.5.2-win64/
   LookForward.exe        程序本体（静态链接，不需要 DLL）
   language/              语言文件：EN.json（默认）、CN.json，必须和 exe 放在一起
   README.md、README_CN.md
@@ -230,4 +230,4 @@ data/
 
 ## 关于
 
-v1.5.1（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。
+v1.5.2（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。

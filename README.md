@@ -1,4 +1,4 @@
-# LookForward Calendar (LFCalendar) v1.5.1
+# LookForward Calendar (LFCalendar) v1.5.2
 
 English | [中文](README_CN.md)
 
@@ -23,7 +23,7 @@ LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows b
 Download `LookForward-v<version>-win64.zip`, unzip it anywhere and double-click `LookForward.exe` (or run it from Windows Terminal / PowerShell / cmd). Nothing needs to be installed.
 
 ```
-LookForward-v1.5.1-win64/
+LookForward-v1.5.2-win64/
   LookForward.exe        the program (statically linked, no DLLs needed)
   language/              language files: EN.json (default), CN.json; must stay next to the exe
   README.md, README_CN.md
@@ -234,4 +234,4 @@ The language files are in `language/` next to the exe (not in `data/`): `EN.json
 
 ## About
 
-v1.5.1 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).
+v1.5.2 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).

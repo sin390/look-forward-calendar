@@ -273,7 +273,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
    The reminder period is [start − lead time, end); without an end time it ends at the start minute; an all-day event starts at 0:00 and lasts until the end of the day.
    Events in their reminder period go into the reminder list, sorted by time; the status bar shows how many. The program refreshes every 30 seconds and reloads when the date changes at midnight.
 10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
-11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.5.1, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
+11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.5.2, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
 12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
 13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`). Since v1.5.0 the official name is written "LookForward Calendar", still LFCalendar for short.
     The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create the data file; import ignores text around the code block.
@@ -304,10 +304,16 @@ language/            language files (EN.json is the template, CN.json is Chinese
 18. **v1.5.0 slogan**: when the status bar has no message it shows the slogan (`slogan` in `preference.json`, default "Look Forward!", user text, not translated). At startup the "Refreshed" message is cleared so the slogan shows. `e` opens `SloganDialog`; an empty value restores the default.
 19. **v1.5.1 task overview layout**: columns are ID / Task / Status / Progress / Done/Total / Created / Due / Weekly / Today's goal.
     - The ID has its own first column (dim, without brackets); the name column no longer contains `(ID:xxxx)`.
-    - The name column is as wide as the longest listed name, at most 32 cells. Longer names end with a dim `…`; the selected row scrolls with `<` `>` (`,` `.`), 4 cells per press, reset when the selection or tab changes. Scrolling counts display cells, so full-width characters are never cut in half.
+    - The name column is as wide as the longest listed name, at most 32 cells (since v1.5.2: limited by the window width instead, see 20). Longer names end with a dim `…`; the selected row scrolls with `<` `>` (`,` `.`), 4 cells per press, reset when the selection or tab changes. Scrolling counts display cells, so full-width characters are never cut in half.
     - While the selected name overflows, a dim `━` thumb is drawn on the separator under the header, above the name column.
     - Progress shows only the percentage (no bar). The selected row has a dark grey background and bold text instead of inverted colours, so each column keeps its colour.
     - "Today" was renamed "Today's goal": it is today's planned quota, which does not drop when work is logged today (see the planning rules).
+20. **v1.5.2 task overview column widths**: fixed column widths could add up to more than the window, and FTXUI then squeezed every column so neighbours ran together.
+    - Columns other than ID and name are as wide as their header or longest value, plus a 2-cell gap; this also adapts to the language.
+    - The name column gets the rest of the window width (terminal width minus the panel border, the scroll indicator and the other columns), at least 8 cells, and never wider than the longest name. Longer names scroll as in 19.
+    - The name column always keeps a 1-cell gap before Status, so a scrolled selected name never touches the next column.
+    - Fixed: in a name slice, the empty glyph after each full-width character was output as a space, so Chinese names were twice as wide and overflowed into Status. Only a full-width character cut at the left edge is padded with a space now.
+    - Fixed: pressing `3` with no completed tasks (or when every name is very short) crashed the program, because `std::clamp` got a lower bound above its upper bound.
 
 ## 9. Possible future work
 
