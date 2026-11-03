@@ -2,7 +2,7 @@
 
 [English](design.md) | 中文
 
-LookForwardCalendar（LFCalendar），基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 固定日程 / 长期任务）+ 农历 + 中日节假日。
+LookForward Calendar（LFCalendar），基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 固定日程 / 长期任务）+ 农历 + 中日节假日。
 
 ## 1. 技术栈
 
@@ -275,7 +275,7 @@ language/            语言文件（EN.json 为模板，CN.json 为中文）
 10. **子界面**：右侧总览栏取消，改为整屏子界面。`o` 任务总览（`1` 进行中按截止日期排序、`2` 全部按创建日期排序、`3` 已完成按最终截止日期排序），`m` 提醒列表（Enter 跳到该日期）。`Esc`/`q` 返回主界面。
 11. 界面上显示任务的地方都附带 `(ID:xxxx)`。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.5.0，2026-11-03；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
 12. 任务总览中 `Enter` 查看选中任务的全部日志（按时间顺序，由 `DescribeLogEntry` 生成可读文字），`d` 删除任务文件（按 `y` 确认）。子界面自行处理返回键。
-13. **v1.2.0**：程序命名为 LookForwardCalendar（简称 LFCalendar，可执行文件 `LookForward.exe`）。
+13. **v1.2.0**：程序命名为 LookForwardCalendar（简称 LFCalendar，可执行文件 `LookForward.exe`）。v1.5.0 起正式名称写作“LookForward Calendar”，简称仍为 LFCalendar。
     节假日提示词要求 AI 把 JSON 放在 ```json 代码块中，能生成文件时同时生成数据文件；导入时忽略代码块前后的说明文字。
     侧边栏、状态栏消息、对话框提示改用 `WrapText` 自动换行（`ftxui::paragraph` 只在空格处断行，长中文不换行）；侧边栏只做纵向滚动（`yframe`）。
     侧边栏任务的显示顺序：任务名 / ID 与状态 / 计划与实际 / 进行内容 / 按钮行（进行、暂停或恢复、修改、中止、完成），任务之间空一行。

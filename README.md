@@ -1,4 +1,4 @@
-# LookForwardCalendar (LFCalendar) v1.5.0
+# LookForward Calendar (LFCalendar) v1.5.0
 
 English | [中文](README_CN.md)
 
@@ -6,7 +6,7 @@ English | [中文](README_CN.md)
 
 > A sun rising over a calendar page, and one highlighted day in the date grid: looking forward to every day ahead. The same pixel data is used as the exe icon; press `v` in the program to see the terminal version.
 
-LookForwardCalendar (LFCalendar for short) is a terminal calendar for Windows built with [FTXUI](https://github.com/ArthurSonzogni/FTXUI). It shows a month view with the Chinese lunar calendar and solar terms, Chinese and Japanese public holidays, events with reminders, recurring fixed schedules, and long-term tasks whose remaining work is spread automatically over the workdays.
+LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows built with [FTXUI](https://github.com/ArthurSonzogni/FTXUI). It shows a month view with the Chinese lunar calendar and solar terms, Chinese and Japanese public holidays, events with reminders, recurring fixed schedules, and long-term tasks whose remaining work is spread automatically over the workdays.
 
 ## Features
 

@@ -1,4 +1,4 @@
-# LookForwardCalendar（LFCalendar）v1.5.0
+# LookForward Calendar（LFCalendar）v1.5.0
 
 [English](README.md) | 中文
 
@@ -6,7 +6,7 @@
 
 > 日历页上升起的太阳，和日期格里高亮的那一天：期待接下来的每一天。同一份像素数据也用作 exe 图标；程序内按 `v` 可以看到终端版。
 
-LookForwardCalendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 的终端日历程序（Windows）。月视图日历，支持农历与节气、中国/日本节假日、带提醒的日程事件，以及按工作日自动分配工作量的长期任务。
+LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 的终端日历程序（Windows）。月视图日历，支持农历与节气、中国/日本节假日、带提醒的日程事件，以及按工作日自动分配工作量的长期任务。
 
 ## 功能一览
 

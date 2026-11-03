@@ -2,7 +2,7 @@
 
 English | [中文](design_CN.md)
 
-LookForwardCalendar (LFCalendar), a terminal calendar built with FTXUI: month view + schedule management (events / fixed schedules / long-term tasks) + Chinese lunar calendar + Chinese and Japanese holidays.
+LookForward Calendar (LFCalendar), a terminal calendar built with FTXUI: month view + schedule management (events / fixed schedules / long-term tasks) + Chinese lunar calendar + Chinese and Japanese holidays.
 
 ## 1. Tech stack
 
@@ -275,7 +275,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
 10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
 11. Every place that shows a task also shows `(ID:xxxx)`. `v` opens the version information; the version is in `src/version.h` (currently v1.5.0, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
 12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
-13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`).
+13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`). Since v1.5.0 the official name is written "LookForward Calendar", still LFCalendar for short.
     The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create the data file; import ignores text around the code block.
     The sidebar, status bar messages and dialog hints wrap with `WrapText` (`ftxui::paragraph` only breaks at spaces, so long Chinese text never wrapped); the sidebar scrolls only vertically (`yframe`).
     Order of a task in the sidebar: name / ID and status / plan and actual / progress note / button row (Log, Pause or Resume, Modify, Abort, Done), with a blank line between tasks.
