@@ -55,37 +55,38 @@ Third line of a day cell: `●n` means n events that day; `◆n` means n fixed s
 
 Only keys found on every keyboard are used.
 
-| Where | Key | Action |
-|---|---|---|
-| Calendar | arrows / `h` `j` `k` `l` | move the selected day |
-| | `[` `]` | previous / next month |
-| | `t` | back to today |
-| | `Tab` | go to the sidebar |
-| | `a` | new event on the selected day |
-| | `f` | new fixed schedule starting on the selected day |
-| | `n` | new long-term task |
-| | `o` | task overview |
-| | `m` | reminder list |
-| | `i` | import holidays |
-| | `c` | switch the holidays shown on the calendar between holiday config 1 and 2; saved automatically |
-| | `g` | switch the UI language to the next file in `language/` (e.g. CN → EN → CN); saved automatically |
-| | `r` | refresh (re-read the data files) |
-| | `v` | version information |
-| | `q` | quit |
-| Sidebar | arrows / `h` `j` `k` `l` | move between buttons |
-| | `Enter` | press the button |
-| | `Tab` / `Esc` | back to the calendar |
-| Dialogs | `Tab` | next field |
-| | `Space` / `Enter` | toggle a checkbox, press a button |
-| | `Esc` | close |
-| Task overview | `1` / `2` / `3` | Active (by due date) / All (by creation date) / Completed (by final due date) |
-| | `j` `k` | move up / down |
-| | `Enter` | show the full log of the selected task (in chronological order); `Esc` goes back |
-| | `d` | delete everything about the selected task (press `y` to confirm, any other key cancels) |
-| | `Esc` / `q` / `o` | back |
-| Reminder list | `j` `k` | move up / down |
-| | `Enter` | jump to the event's date |
-| | `Esc` / `q` / `m` | back |
+
+| Where         | Key                     | Action                                                                                           |
+| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| Calendar      | arrows /`h` `j` `k` `l` | move the selected day                                                                            |
+|               | `[` `]`                 | previous / next month                                                                            |
+|               | `t`                     | back to today                                                                                    |
+|               | `Tab`                   | go to the sidebar                                                                                |
+|               | `a`                     | new event on the selected day                                                                    |
+|               | `f`                     | new fixed schedule starting on the selected day                                                  |
+|               | `n`                     | new long-term task                                                                               |
+|               | `o`                     | task overview                                                                                    |
+|               | `m`                     | reminder list                                                                                    |
+|               | `i`                     | import holidays                                                                                  |
+|               | `c`                     | switch the holidays shown on the calendar between holiday config 1 and 2; saved automatically    |
+|               | `g`                     | switch the UI language to the next file in`language/` (e.g. CN → EN → CN); saved automatically |
+|               | `r`                     | refresh (re-read the data files)                                                                 |
+|               | `v`                     | version information                                                                              |
+|               | `q`                     | quit                                                                                             |
+| Sidebar       | arrows /`h` `j` `k` `l` | move between buttons                                                                             |
+|               | `Enter`                 | press the button                                                                                 |
+|               | `Tab` / `Esc`           | back to the calendar                                                                             |
+| Dialogs       | `Tab`                   | next field                                                                                       |
+|               | `Space` / `Enter`       | toggle a checkbox, press a button                                                                |
+|               | `Esc`                   | close                                                                                            |
+| Task overview | `1` / `2` / `3`         | Active (by due date) / All (by creation date) / Completed (by final due date)                    |
+|               | `j` `k`                 | move up / down                                                                                   |
+|               | `Enter`                 | show the full log of the selected task (in chronological order);`Esc` goes back                  |
+|               | `d`                     | delete everything about the selected task (press`y` to confirm, any other key cancels)           |
+|               | `Esc` / `q` / `o`       | back                                                                                             |
+| Reminder list | `j` `k`                 | move up / down                                                                                   |
+|               | `Enter`                 | jump to the event's date                                                                         |
+|               | `Esc` / `q` / `m`       | back                                                                                             |
 
 ## Events and reminders
 
@@ -101,15 +102,16 @@ Tick "Remind" and enter a lead time: `30m` (30 minutes), `1:30` (1 hour 30 minut
 
 Work that repeats on a cycle at a fixed time, such as meetings, classes or routine work. Press `f` on the calendar, or "+ New fixed schedule" in the sidebar, and fill in:
 
-| Field | Notes |
-|---|---|
-| Work content | required |
-| Start time / End time | required, `HH:MM` |
-| Repeat | Daily / Weekly (default) / Biweekly / Monthly |
-| Days | for Weekly and Biweekly, which days of the week; defaults to the start date's weekday |
-| Start date | defaults to the selected day |
-| End date | optional; empty means it repeats forever |
-| Note | optional |
+
+| Field                 | Notes                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| Work content          | required                                                                              |
+| Start time / End time | required,`HH:MM`                                                                      |
+| Repeat                | Daily / Weekly (default) / Biweekly / Monthly                                         |
+| Days                  | for Weekly and Biweekly, which days of the week; defaults to the start date's weekday |
+| Start date            | defaults to the selected day                                                          |
+| End date              | optional; empty means it repeats forever                                              |
+| Note                  | optional                                                                              |
 
 - Biweekly: every other week, counted from the week of the start date.
 - Monthly: on the start date's day of the month; months without that day (e.g. the 31st) are skipped.
@@ -120,14 +122,15 @@ Work that repeats on a cycle at a fixed time, such as meetings, classes or routi
 
 Press `n` to create a task:
 
-| Field | Notes |
-|---|---|
-| Task name | required |
-| Planned hours | hours, e.g. `40` or `12:30` |
-| Due date | `YYYY-MM-DD` |
-| Workdays | which days of the week you work on it |
-| Skip holidays | when ticked, no work is planned on days off |
-| Holiday country | the country whose holidays are skipped |
+
+| Field           | Notes                                       |
+| --------------- | ------------------------------------------- |
+| Task name       | required                                    |
+| Planned hours   | hours, e.g.`40` or `12:30`                  |
+| Due date        | `YYYY-MM-DD`                                |
+| Workdays        | which days of the week you work on it       |
+| Skip holidays   | when ticked, no work is planned on days off |
+| Holiday country | the country whose holidays are skipped      |
 
 Each task gets a random ID (e.g. `ID:a3f9`). In the sidebar the first line of a task is its name and the second its ID and status, with a blank line between tasks. When the content is taller than the screen a scrollbar appears on the right; scroll with the arrow keys or the mouse wheel. In the task overview, `Enter` shows the task's full log and `d` deletes the task (its file is deleted and cannot be recovered).
 
@@ -141,12 +144,13 @@ Each task gets a random ID (e.g. `ID:a3f9`). In the sidebar the first line of a 
 
 **Task buttons in the sidebar** (on the last line of each task, left to right)
 
-| Button | What it does |
-|---|---|
-| `[Log]` | enter the actual time and a note for the day; can be changed any time. Future dates are locked |
-| `[Pause]` / `[Resume]` | no work is planned while paused; the due date stays the same |
-| `[Modify]` | change the hours, due date, workdays and so on; the plan is recalculated |
-| `[Abort]` / `[Done]` | end the task |
+
+| Button                 | What it does                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `[Log]`                | enter the actual time and a note for the day; can be changed any time. Future dates are locked |
+| `[Pause]` / `[Resume]` | no work is planned while paused; the due date stays the same                                   |
+| `[Modify]`             | change the hours, due date, workdays and so on; the plan is recalculated                       |
+| `[Abort]` / `[Done]`   | end the task                                                                                   |
 
 When you create or modify a task that skips holidays, and holiday data for some year between today and the due date has not been imported, the operation is cancelled and you are asked to import it first.
 
