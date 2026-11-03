@@ -1,4 +1,4 @@
-# LookForward Calendar (LFCalendar) v1.5.0
+# LookForward Calendar (LFCalendar) v1.5.1
 
 English | [中文](README_CN.md)
 
@@ -23,7 +23,7 @@ LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows b
 Download `LookForward-v<version>-win64.zip`, unzip it anywhere and double-click `LookForward.exe` (or run it from Windows Terminal / PowerShell / cmd). Nothing needs to be installed.
 
 ```
-LookForward-v1.5.0-win64/
+LookForward-v1.5.1-win64/
   LookForward.exe        the program (statically linked, no DLLs needed)
   language/              language files: EN.json (default), CN.json; must stay next to the exe
   README.md, README_CN.md
@@ -100,6 +100,7 @@ Only keys found on every keyboard are used.
 |               | `Esc`                   | close                                                                                            |
 | Task overview | `1` / `2` / `3`         | Active (by due date) / All (by creation date) / Completed (by final due date)                    |
 |               | `j` `k`                 | move up / down                                                                                   |
+|               | `<` `>` (or `,` `.`)    | scroll a long name of the selected task left / right                                             |
 |               | `Enter`                 | show the full log of the selected task (in chronological order);`Esc` goes back                  |
 |               | `d`                     | delete everything about the selected task (press`y` to confirm, any other key cancels)           |
 |               | `Esc` / `q` / `o`       | back                                                                                             |
@@ -233,4 +234,4 @@ The language files are in `language/` next to the exe (not in `data/`): `EN.json
 
 ## About
 
-v1.5.0 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).
+v1.5.1 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).

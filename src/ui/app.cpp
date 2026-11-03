@@ -30,7 +30,7 @@ enum View { kMainView = 0, kOverviewView = 1, kReminderView = 2 };
 Element StatusBar(AppState& s, int view, int pane) {
   std::vector<std::string> hints;
   if (view == kOverviewView)
-    hints = {Tr("1 Active  2 All  3 Completed  ↑↓/jk select  Enter view log  d delete task  Esc/q back")};
+    hints = {Tr("1 Active  2 All  3 Completed  ↑↓/jk select  </> scroll name  Enter view log  d delete task  Esc/q back")};
   else if (view == kReminderView)
     hints = {Tr("↑↓/jk select  Enter go to date  Esc/q/m back")};
   else if (pane == kMonthPane)

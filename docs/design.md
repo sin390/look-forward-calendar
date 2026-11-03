@@ -273,7 +273,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
    The reminder period is [start − lead time, end); without an end time it ends at the start minute; an all-day event starts at 0:00 and lasts until the end of the day.
    Events in their reminder period go into the reminder list, sorted by time; the status bar shows how many. The program refreshes every 30 seconds and reloads when the date changes at midnight.
 10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
-11. Every place that shows a task also shows `(ID:xxxx)`. `v` opens the version information; the version is in `src/version.h` (currently v1.5.0, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
+11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.5.1, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
 12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
 13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`). Since v1.5.0 the official name is written "LookForward Calendar", still LFCalendar for short.
     The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create the data file; import ignores text around the code block.
@@ -302,6 +302,12 @@ language/            language files (EN.json is the template, CN.json is Chinese
 17. **v1.5.0 lunar calendar on/off**: `u` toggles `lunar` in `preference.json` (default true).
     When off, calendar cells show only holiday names on the second line (no lunar dates, lunar festivals or solar terms), and the sidebar shows the slogan (see 18) where the lunar date and festival/solar term lines were.
 18. **v1.5.0 slogan**: when the status bar has no message it shows the slogan (`slogan` in `preference.json`, default "Look Forward!", user text, not translated). At startup the "Refreshed" message is cleared so the slogan shows. `e` opens `SloganDialog`; an empty value restores the default.
+19. **v1.5.1 task overview layout**: columns are ID / Task / Status / Progress / Done/Total / Created / Due / Weekly / Today's goal.
+    - The ID has its own first column (dim, without brackets); the name column no longer contains `(ID:xxxx)`.
+    - The name column is as wide as the longest listed name, at most 32 cells. Longer names end with a dim `…`; the selected row scrolls with `<` `>` (`,` `.`), 4 cells per press, reset when the selection or tab changes. Scrolling counts display cells, so full-width characters are never cut in half.
+    - While the selected name overflows, a dim `━` thumb is drawn on the separator under the header, above the name column.
+    - Progress shows only the percentage (no bar). The selected row has a dark grey background and bold text instead of inverted colours, so each column keeps its colour.
+    - "Today" was renamed "Today's goal": it is today's planned quota, which does not drop when work is logged today (see the planning rules).
 
 ## 9. Possible future work
 

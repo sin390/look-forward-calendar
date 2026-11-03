@@ -4,6 +4,7 @@
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/event.hpp>
 #include <ftxui/dom/elements.hpp>
+#include <ftxui/screen/string.hpp>
 
 #include "ui/screens.h"
 #include "ui/widgets.h"
@@ -25,26 +26,68 @@ Color StatusColor(const TaskEntry& e) {
   return Color::Green;
 }
 
-// 表格列宽（名称列自适应）
-constexpr int kStatusW = 12, kGaugeW = 22, kDoneW = 15, kDateW = 12, kWeekW = 34, kTodayW = 8;
+// 表格列宽。名称列按最长名称取宽，但不超过 kNameMaxW，超出部分可横向滚动
+constexpr int kNameMaxW = 32, kIdW = 5, kStatusW = 12, kProgressW = 10, kDoneW = 15, kDateW = 12, kWeekW = 34,
+              kTodayW = 14;
+constexpr int kNameScrollStep = 4;
 
 Element Cell(Element e, int width) { return std::move(e) | size(WIDTH, EQUAL, width); }
 
-Element HeaderRow() {
+// 名称列内容 " 名称"，按显示列拆成字形（全角字符后跟一个空字形）
+std::vector<std::string> NameGlyphs(const TaskEntry& e) { return Utf8ToGlyphs(" " + e.task.name); }
+int NameWidth(const TaskEntry& e) { return static_cast<int>(NameGlyphs(e).size()); }
+
+// 取显示列 [from, from+width)，被切开的全角字符用空格补位
+std::string SliceCells(const std::vector<std::string>& g, int from, int width) {
+  const int n = static_cast<int>(g.size());
+  std::string out;
+  for (int i = std::max(0, from); i < std::min(n, from + width); ++i) {
+    const bool cut_tail = i == from + width - 1 && i + 1 < n && g[static_cast<size_t>(i + 1)].empty();
+    const std::string& c = g[static_cast<size_t>(i)];
+    out += (c.empty() || cut_tail) ? " " : c;
+  }
+  return out;
+}
+
+// 名称单元格，从第 offset 列开始显示 width 列。未选中行溢出时末尾显示省略号
+Element NameCell(const TaskEntry& e, int width, int offset, bool selected) {
+  const std::vector<std::string> g = NameGlyphs(e);
+  const bool ellipsis = !selected && static_cast<int>(g.size()) > width;
+  auto name = text(SliceCells(g, offset, ellipsis ? width - 1 : width));
+  if (e.plan.overdue) name |= color(Color::Red);
+  Elements parts = {name};
+  if (ellipsis) parts.push_back(text("…") | dim);
+  return Cell(hbox(std::move(parts)), width);
+}
+
+// 表头下的分隔线，名称列溢出时在其上叠一条细滚动条
+Element NameScrollBar(int width, int offset, int content_w) {
+  if (content_w <= width) return separatorLight();
+  const int thumb = std::max(1, width * width / content_w);
+  const int pos = offset * (width - thumb) / (content_w - width);
+  std::string bar;
+  for (int i = 0; i < width; ++i) bar += i >= pos && i < pos + thumb ? "━" : "─";
+  // 名称列在 ID 列之后，前面空出 ID 列宽度，露出底下的分隔线
+  return dbox({separatorLight(), hbox({text("") | size(WIDTH, EQUAL, kIdW), text(bar) | dim, filler()})});
+}
+
+Element HeaderRow(int name_w) {
   return hbox({
-             text(Tr(" Task")) | flex,
+             Cell(text(" ID"), kIdW),
+             Cell(text(Tr(" Task")), name_w),
              Cell(text(Tr("Status")), kStatusW),
-             Cell(text(Tr("Progress")), kGaugeW),
+             Cell(text(Tr("Progress")), kProgressW),
              Cell(text(Tr("Done/Total")), kDoneW),
              Cell(text(Tr("Created")), kDateW),
              Cell(text(Tr("Due")), kDateW),
              Cell(text(Tr("Weekly")), kWeekW),
-             Cell(text(Tr("Today")), kTodayW),
+             Cell(text(Tr("Today's goal")), kTodayW),
+             filler(),
          }) |
          bold;
 }
 
-Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays) {
+Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays, Element name_cell) {
   const TaskSpec& spec = e.state.spec;
   const Color c = StatusColor(e);
   const int done = e.state.DoneTotal();
@@ -58,19 +101,17 @@ Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays)
       today_text = Tr("Off");
   }
 
-  auto name = text(" " + e.task.name);
-  if (e.plan.overdue) name |= color(Color::Red);
   return hbox({
-      hbox({name, text(" " + IdTag(e.task.id)) | dim}) | flex,
+      Cell(text(" " + e.task.id) | dim, kIdW),
+      std::move(name_cell),
       Cell(text(StatusText(e.state, e.plan, today)) | color(c), kStatusW),
-      Cell(hbox({gauge(ratio) | color(c) | flex,
-                 text(" " + std::to_string(int(ratio * 100 + 0.5f)) + "%") | size(WIDTH, EQUAL, 5)}),
-           kGaugeW),
+      Cell(text(std::to_string(int(ratio * 100 + 0.5f)) + "%") | color(c), kProgressW),
       Cell(text(FormatMinutes(done) + " / " + FormatMinutes(spec.total_minutes)), kDoneW),
       Cell(text(FormatDate(e.state.created)), kDateW),
       Cell(text(FormatDate(spec.due)), kDateW),
       Cell(text(WeekdaysText(spec.weekdays) + (spec.skip_holiday ? Tr(" skip {config}", {{"config", HolidayConfigShortName(spec.holiday_config)}}) : "")), kWeekW),
       Cell(text(today_text) | color(Color::Cyan), kTodayW),
+      filler(),
   });
 }
 
@@ -108,8 +149,10 @@ class OverviewScreenBase : public ComponentBase {
     else if (e == Event::Character('1')) SetFilter(kActive);
     else if (e == Event::Character('2')) SetFilter(kAll);
     else if (e == Event::Character('3')) SetFilter(kCompleted);
-    else if (e == Event::ArrowDown || e == Event::Character('j')) ++selected_;
-    else if (e == Event::ArrowUp || e == Event::Character('k')) --selected_;
+    else if (e == Event::ArrowDown || e == Event::Character('j')) MoveSelection(1);
+    else if (e == Event::ArrowUp || e == Event::Character('k')) MoveSelection(-1);
+    else if (e == Event::Character('<') || e == Event::Character(',')) name_offset_ -= kNameScrollStep;
+    else if (e == Event::Character('>') || e == Event::Character('.')) name_offset_ += kNameScrollStep;
     else if (e == Event::Return || e == Event::Character('l') || e == Event::ArrowRight) OpenSelected(kLog);
     else if (e == Event::Character('d')) OpenSelected(kConfirmDelete);
     else return false;
@@ -201,23 +244,40 @@ class OverviewScreenBase : public ComponentBase {
     tabs.push_back(filler());
     tabs.push_back(text(Tr(kSortHint[static_cast<size_t>(filter_)])) | dim);
 
+    // 名称列宽取最长名称，限制在 [表头宽, kNameMaxW]；只有选中行可横向滚动
+    int name_w = string_width(Tr(" Task")) + 1;
+    for (const TaskEntry* e : list) name_w = std::max(name_w, NameWidth(*e) + 1);
+    name_w = std::min(name_w, kNameMaxW);
+    const int selected_w = list.empty() ? 0 : NameWidth(*list[static_cast<size_t>(selected_)]);
+    name_offset_ = std::clamp(name_offset_, 0, std::max(0, selected_w - name_w));
+
     Elements rows;
     for (size_t i = 0; i < list.size(); ++i) {
-      auto row = TaskRow(*list[i], s_.today(), s_.holidays());
-      if (static_cast<int>(i) == selected_) row = row | inverted | focus;
+      const bool selected = static_cast<int>(i) == selected_;
+      auto name = NameCell(*list[i], name_w, selected ? name_offset_ : 0, selected);
+      auto row = TaskRow(*list[i], s_.today(), s_.holidays(), std::move(name));
+      // 选中行用浅灰底色而非反色，保留各列原有颜色
+      if (selected) row = row | bold | bgcolor(Color::RGB(60, 60, 60)) | focus;
       rows.push_back(row);
     }
     if (rows.empty()) rows.push_back(text(Tr(" No matching tasks")) | dim);
 
     return Panel(Tr("Task overview ({n})", {{"n", std::to_string(list.size())}}),
-                 vbox({hbox(std::move(tabs)), separatorLight(), HeaderRow(), separatorLight(),
+                 vbox({hbox(std::move(tabs)), separatorLight(), HeaderRow(name_w),
+                       NameScrollBar(name_w, name_offset_, selected_w),
                        vbox(std::move(rows)) | vscroll_indicator | yframe | flex}),
                  true);
+  }
+
+  void MoveSelection(int delta) {
+    selected_ += delta;
+    name_offset_ = 0;
   }
 
   void SetFilter(int f) {
     filter_ = f;
     selected_ = 0;
+    name_offset_ = 0;
   }
 
   std::vector<const TaskEntry*> Filtered() const {
@@ -245,6 +305,7 @@ class OverviewScreenBase : public ComponentBase {
   Mode mode_ = kList;
   int filter_ = kActive;
   int selected_ = 0;
+  int name_offset_ = 0;  // 选中行名称的横向滚动偏移（显示列）
   std::string target_;  // 日志/删除确认针对的任务 id
   int log_selected_ = 0;
 };

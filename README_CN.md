@@ -1,4 +1,4 @@
-# LookForward Calendar（LFCalendar）v1.5.0
+# LookForward Calendar（LFCalendar）v1.5.1
 
 [English](README.md) | 中文
 
@@ -23,7 +23,7 @@ LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/
 下载 `LookForward-v<版本>-win64.zip`，解压到任意位置，双击 `LookForward.exe`（或在 Windows Terminal / PowerShell / cmd 中运行）即可，不需要安装。
 
 ```
-LookForward-v1.5.0-win64/
+LookForward-v1.5.1-win64/
   LookForward.exe        程序本体（静态链接，不需要 DLL）
   language/              语言文件：EN.json（默认）、CN.json，必须和 exe 放在一起
   README.md、README_CN.md
@@ -99,6 +99,7 @@ LookForward-v1.5.0-win64/
 | | `Esc` | 关闭 |
 | 任务总览 | `1` / `2` / `3` | 进行中（按截止日期）/ 全部（按创建日期）/ 已完成（按最终截止日期） |
 | | `j` `k` | 上下选择 |
+| | `<` `>`（或 `,` `.`） | 左右滚动选中任务的长名称 |
 | | `Enter` | 查看选中任务的全部日志（按时间顺序），`Esc` 返回列表 |
 | | `d` | 删除选中任务的全部信息（再按 `y` 确认，其他键取消） |
 | | `Esc` / `q` / `o` | 返回 |
@@ -229,4 +230,4 @@ data/
 
 ## 关于
 
-v1.5.0（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。
+v1.5.1（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。
