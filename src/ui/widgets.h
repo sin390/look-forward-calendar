@@ -10,6 +10,7 @@
 #include <ftxui/dom/elements.hpp>
 
 #include "app/app_state.h"
+#include "core/i18n.h"
 
 namespace cal::ui {
 
@@ -28,9 +29,10 @@ ftxui::Element Panel(const std::string& title, ftxui::Element body, bool focused
 // ftxui::paragraph 只在空格处断行，长中文不会换行
 ftxui::Element WrapText(std::string_view s);
 
-std::string WeekdayName(int iso_weekday);  // 1 -> "周一"
+std::string WeekdayName(int iso_weekday);       // 1 -> "Mon"（中文：周一）
+std::string WeekdayShortName(int iso_weekday);  // 1 -> "Mo"（中文：一）
 std::string IdTag(const std::string& task_id);  // "(ID:a3f9)"
-std::string ShortDate(Date d);             // "11月2日"
+std::string ShortDate(Date d);             // "11/2"（中文：11月2日）
 
 // 把操作结果写入状态栏，成功时显示 ok_msg
 void Report(AppState& s, const Result& r, const std::string& ok_msg);

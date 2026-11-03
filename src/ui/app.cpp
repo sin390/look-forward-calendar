@@ -1,6 +1,7 @@
 #include "ui/app.h"
 
 #include <atomic>
+#include <memory>
 #include <chrono>
 #include <thread>
 
@@ -29,15 +30,15 @@ enum View { kMainView = 0, kOverviewView = 1, kReminderView = 2 };
 Element StatusBar(AppState& s, int view, int pane) {
   std::vector<std::string> hints;
   if (view == kOverviewView)
-    hints = {"1 进行中  2 全部  3 已完成  ↑↓/jk 选择  Enter 查看日志  d 删除任务  Esc/q 返回"};
+    hints = {Tr("1 Active  2 All  3 Completed  ↑↓/jk select  Enter view log  d delete task  Esc/q back")};
   else if (view == kReminderView)
-    hints = {"↑↓/jk 选择  Enter 跳到该日期  Esc/q/m 返回"};
+    hints = {Tr("↑↓/jk select  Enter go to date  Esc/q/m back")};
   else if (pane == kMonthPane)
-    hints = {"移动  方向键/hjkl 选日期   [ ] 翻月   t 今天   Tab 侧边栏",
-             "功能  a 事件  f 固定日程  n 任务  o 总览  m 提醒  r 刷新  v 版本  q 退出",
-             "配置  c 国家  g 语言  i 节假日"};
+    hints = {Tr("Move      arrows/hjkl date   [ ] month   t today   Tab sidebar"),
+             Tr("Actions   a event  f fixed schedule  n task  o overview  m reminders  r refresh  v version  q quit"),
+             Tr("Settings  c switch holidays  g language  i import holidays")};
   else
-    hints = {"方向键/hjkl 选择  Enter 按下按钮  Tab/Esc 返回月历"};
+    hints = {Tr("arrows/hjkl select  Enter press button  Tab/Esc back to calendar")};
 
   Elements lines;
   for (const std::string& h : hints) lines.push_back(text(h) | dim);
@@ -45,7 +46,7 @@ Element StatusBar(AppState& s, int view, int pane) {
   if (s.message_is_error()) msg |= color(Color::Red);
   Element reminder = text("");
   if (const size_t n = s.ActiveReminders(NowLocal()).size(); n > 0)
-    reminder = text(" ⏰ 提醒 " + std::to_string(n) + " 条（m 查看） ") | bgcolor(Color::Yellow) | color(Color::Black);
+    reminder = text(Tr(" ⏰ Reminders: {n} (m to view) ", {{"n", std::to_string(n)}})) | bgcolor(Color::Yellow) | color(Color::Black);
   lines.push_back(hbox({msg | flex, reminder}));
   return vbox(std::move(lines));
 }
@@ -110,7 +111,13 @@ App::App(AppState& state, std::function<void()> on_quit)
     else if (e == Event::Character('n')) task_dialog_.OpenCreate();
     else if (e == Event::Character('i')) holiday_dialog_.Open();
     else if (e == Event::Character('c')) state_.CycleDisplayCountry();
-    else if (e == Event::Character('g')) state_.CycleLanguage();
+    else if (e == Event::Character('g')) {
+      // 按钮、标签等文字在构造时生成，切换语言后退出事件循环，由 RunApp 重建界面
+      if (state_.CycleLanguage()) {
+        restart_ = true;
+        on_quit();
+      }
+    }
     else if (e == Event::Character('r')) state_.Reload();
     else if (e == Event::Character('o')) view_ = kOverviewView;
     else if (e == Event::Character('m')) view_ = kReminderView;
@@ -129,7 +136,6 @@ App::App(AppState& state, std::function<void()> on_quit)
 
 int RunApp(AppState& state) {
   auto screen = ScreenInteractive::Fullscreen();
-  App app(state, screen.ExitLoopClosure());
 
   // 每 30 秒唤醒一次界面
   std::atomic<bool> running = true;
@@ -140,17 +146,25 @@ int RunApp(AppState& state) {
       if (running) screen.PostEvent(Event::Custom);
     }
   });
-  screen.Loop(app.root());
+  // 切换语言后重建整个界面，数据状态（AppState）保留
+  for (bool restart = true; restart;) {
+    App app(state, screen.ExitLoopClosure());
+    screen.Loop(app.root());
+    restart = app.restart_requested();
+  }
   running = false;
   ticker.join();
   return 0;
 }
 
 std::string RenderSnapshot(AppState& state, int width, int height, const std::vector<Event>& keys) {
-  App app(state, [] {});
-  for (const Event& e : keys) app.root()->OnEvent(e);
+  auto app = std::make_unique<App>(state, [] {});
+  for (const Event& e : keys) {
+    app->root()->OnEvent(e);
+    if (app->restart_requested()) app = std::make_unique<App>(state, [] {});
+  }
   auto screen = Screen::Create(Dimension::Fixed(width), Dimension::Fixed(height));
-  Render(screen, app.root()->Render());
+  Render(screen, app->root()->Render());
   return screen.ToString();
 }
 

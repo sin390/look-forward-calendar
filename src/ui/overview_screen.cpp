@@ -26,20 +26,20 @@ Color StatusColor(const TaskEntry& e) {
 }
 
 // 表格列宽（名称列自适应）
-constexpr int kStatusW = 8, kGaugeW = 22, kDoneW = 15, kDateW = 12, kWeekW = 16, kTodayW = 8;
+constexpr int kStatusW = 12, kGaugeW = 22, kDoneW = 15, kDateW = 12, kWeekW = 24, kTodayW = 8;
 
 Element Cell(Element e, int width) { return std::move(e) | size(WIDTH, EQUAL, width); }
 
 Element HeaderRow() {
   return hbox({
-             text(" 任务") | flex,
-             Cell(text("状态"), kStatusW),
-             Cell(text("进度"), kGaugeW),
-             Cell(text("已做/总计"), kDoneW),
-             Cell(text("创建"), kDateW),
-             Cell(text("截止"), kDateW),
-             Cell(text("每周"), kWeekW),
-             Cell(text("今日"), kTodayW),
+             text(Tr(" Task")) | flex,
+             Cell(text(Tr("Status")), kStatusW),
+             Cell(text(Tr("Progress")), kGaugeW),
+             Cell(text(Tr("Done/Total")), kDoneW),
+             Cell(text(Tr("Created")), kDateW),
+             Cell(text(Tr("Due")), kDateW),
+             Cell(text(Tr("Weekly")), kWeekW),
+             Cell(text(Tr("Today")), kTodayW),
          }) |
          bold;
 }
@@ -55,7 +55,7 @@ Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays)
     if (const auto it = e.plan.daily.find(today); it != e.plan.daily.end())
       today_text = FormatMinutes(it->second);
     else if (!IsWorkday(spec, today, holidays))
-      today_text = "休";
+      today_text = Tr("Off");
   }
 
   auto name = text(" " + e.task.name);
@@ -69,7 +69,7 @@ Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays)
       Cell(text(FormatMinutes(done) + " / " + FormatMinutes(spec.total_minutes)), kDoneW),
       Cell(text(FormatDate(e.state.created)), kDateW),
       Cell(text(FormatDate(spec.due)), kDateW),
-      Cell(text(WeekdaysText(spec.weekdays) + (spec.skip_holiday ? " 跳" + spec.country : "")), kWeekW),
+      Cell(text(WeekdaysText(spec.weekdays) + (spec.skip_holiday ? Tr(" skip {country}", {{"country", spec.country}}) : "")), kWeekW),
       Cell(text(today_text) | color(Color::Cyan), kTodayW),
   });
 }
@@ -88,9 +88,9 @@ class OverviewScreenBase : public ComponentBase {
       if (e == Event::Character('y')) {
         const TaskEntry* t = s_.FindTask(target_);
         const std::string label = t ? t->task.name + " " + IdTag(t->task.id) : target_;
-        Report(s_, s_.DeleteTask(target_), "已删除任务 " + label);
+        Report(s_, s_.DeleteTask(target_), Tr("Deleted task {task}", {{"task", label}}));
       } else {
-        s_.Info("已取消删除");
+        s_.Info(Tr("Deletion cancelled"));
       }
       mode_ = kList;
       return true;
@@ -141,12 +141,12 @@ class OverviewScreenBase : public ComponentBase {
   }
 
   static Element ConfirmBox(const TaskEntry& t) {
-    return window(text(" 删除任务 ") | bold | color(Color::Red),
+    return window(text(Tr(" Delete task ")) | bold | color(Color::Red),
                   vbox({
-                      text("将删除 " + t.task.name + " " + IdTag(t.task.id) + " 的全部信息"),
-                      text("（任务文件及其全部日志，无法恢复）") | dim,
+                      text(Tr("All information of {task} will be deleted", {{"task", t.task.name + " " + IdTag(t.task.id)}})),
+                      text(Tr("(the task file and its whole log; this cannot be undone)")) | dim,
                       separatorLight(),
-                      hbox({text("按 "), text(" y ") | inverted, text(" 确认删除，其他任意键取消")}),
+                      hbox({text(Tr("Press ")), text(" y ") | inverted, text(Tr(" to delete, any other key to cancel"))}),
                   })) |
            clear_under | center;
   }
@@ -169,14 +169,18 @@ class OverviewScreenBase : public ComponentBase {
       rows.push_back(row);
     }
     const TaskSpec& spec = t.state.spec;
-    auto summary = text(" " + StatusText(t.state, t.plan, s_.today()) + "    已做 " +
-                        FormatMinutes(t.state.DoneTotal()) + " / " + FormatMinutes(spec.total_minutes) +
-                        "    截止 " + FormatDate(spec.due) + "    文件 task/" + t.task.file_stem + ".json") |
+    auto summary = text(" " + Tr("{status}    Done {done} / {total}    Due {due}    File task/{file}.json",
+                                 {{"status", StatusText(t.state, t.plan, s_.today())},
+                                  {"done", FormatMinutes(t.state.DoneTotal())},
+                                  {"total", FormatMinutes(spec.total_minutes)},
+                                  {"due", FormatDate(spec.due)},
+                                  {"file", t.task.file_stem}})) |
                    dim;
-    return Panel("任务日志：" + t.task.name + " " + IdTag(t.task.id) + "（共 " + std::to_string(n) + " 条，按时间顺序）",
+    return Panel(Tr("Task log: {task} ({n} entries, in chronological order)",
+                    {{"task", t.task.name + " " + IdTag(t.task.id)}, {"n", std::to_string(n)}}),
                  vbox({summary, separatorLight(),
-                       hbox({text(" #") | size(WIDTH, EQUAL, 5), text("时间") | size(WIDTH, EQUAL, 21),
-                             text("内容")}) | bold,
+                       hbox({text(" #") | size(WIDTH, EQUAL, 5), text(Tr("Time")) | size(WIDTH, EQUAL, 21),
+                             text(Tr("Content"))}) | bold,
                        separatorLight(), vbox(std::move(rows)) | vscroll_indicator | yframe | flex}),
                  true);
   }
@@ -185,17 +189,17 @@ class OverviewScreenBase : public ComponentBase {
     const auto list = Filtered();
     selected_ = std::clamp(selected_, 0, std::max(0, static_cast<int>(list.size()) - 1));
 
-    static constexpr std::array<const char*, 3> kTabs = {"1 进行中", "2 全部", "3 已完成"};
+    static constexpr std::array<const char*, 3> kTabs = {N_("1 Active"), N_("2 All"), N_("3 Completed")};
     Elements tabs;
     for (int i = 0; i < 3; ++i) {
-      auto t = text(" " + std::string(kTabs[static_cast<size_t>(i)]) + " ");
+      auto t = text(" " + Tr(kTabs[static_cast<size_t>(i)]) + " ");
       tabs.push_back(i == filter_ ? t | inverted | bold : t | dim);
       tabs.push_back(text(" "));
     }
     static constexpr std::array<const char*, 3> kSortHint = {
-        "按截止日期排序", "按创建日期排序", "按最终截止日期排序"};
+        N_("Sorted by due date"), N_("Sorted by creation date"), N_("Sorted by final due date")};
     tabs.push_back(filler());
-    tabs.push_back(text(kSortHint[static_cast<size_t>(filter_)]) | dim);
+    tabs.push_back(text(Tr(kSortHint[static_cast<size_t>(filter_)])) | dim);
 
     Elements rows;
     for (size_t i = 0; i < list.size(); ++i) {
@@ -203,9 +207,9 @@ class OverviewScreenBase : public ComponentBase {
       if (static_cast<int>(i) == selected_) row = row | inverted | focus;
       rows.push_back(row);
     }
-    if (rows.empty()) rows.push_back(text(" 没有符合条件的任务") | dim);
+    if (rows.empty()) rows.push_back(text(Tr(" No matching tasks")) | dim);
 
-    return Panel("任务总览（共 " + std::to_string(list.size()) + " 个）",
+    return Panel(Tr("Task overview ({n})", {{"n", std::to_string(list.size())}}),
                  vbox({hbox(std::move(tabs)), separatorLight(), HeaderRow(), separatorLight(),
                        vbox(std::move(rows)) | vscroll_indicator | yframe | flex}),
                  true);

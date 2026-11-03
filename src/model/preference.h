@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "core/json.h"
@@ -9,18 +8,13 @@
 namespace cal {
 
 // 用户配置，保存在 data/preference.json，启动时读取，修改后立即写回
-//   { "country": "CN", "language": "zh-CN" }
+//   { "country": "CN", "language": "EN" }
 
-struct Language {
-  std::string code;  // "zh-CN"
-  std::string name;  // "中文"
-};
-const std::vector<Language>& SupportedLanguages();
-std::string LanguageName(std::string_view code);
+constexpr const char* kDefaultLanguage = "EN";
 
 struct Preference {
-  std::string country = "CN";      // 月历上显示的节假日国家
-  std::string language = "zh-CN";  // 界面语言（目前只有中文）
+  std::string country = "CN";              // 月历上显示的节假日国家
+  std::string language = kDefaultLanguage;  // 界面语言：language/ 下语言文件的文件名（不含 .json）
 };
 
 Json ToJson(const Preference& p);

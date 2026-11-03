@@ -4,9 +4,12 @@
 #include <cstdio>
 #include <random>
 
+#include "core/i18n.h"
+
 namespace cal {
 
-AppState::AppState(fs::path data_root) : repo_(std::move(data_root)) {
+AppState::AppState(fs::path data_root, fs::path language_dir)
+    : repo_(std::move(data_root)), language_dir_(std::move(language_dir)) {
   today_ = Today();
   selected_ = today_;
   Reload();
@@ -18,6 +21,7 @@ void AppState::Reload() {
   broken_months_.clear();
   today_ = Today();
   pref_ = repo_.LoadPreference(warnings_);
+  LoadLanguage();  // 先切换语言，之后的提示都用当前语言
   holidays_ = repo_.LoadHolidays(warnings_);
   fixed_ = repo_.LoadFixed(warnings_);
   fixed_months_.clear();
@@ -26,7 +30,7 @@ void AppState::Reload() {
   for (Task& t : repo_.LoadTasks(warnings_)) {
     auto state = Replay(t);
     if (!state) {
-      warnings_.push_back("任务 " + t.file_stem + "：" + state.error());
+      warnings_.push_back(Tr("Task {file}: {error}", {{"file", t.file_stem}, {"error", state.error()}}));
       continue;
     }
     tasks_.push_back({std::move(t), std::move(*state), {}});
@@ -34,9 +38,11 @@ void AppState::Reload() {
   RecomputePlans();
 
   if (warnings_.empty())
-    Info("已刷新");
+    Info(Tr("Refreshed"));
+  else if (warnings_.size() == 1)
+    Error(warnings_.front());
   else
-    Error(warnings_.front() + (warnings_.size() > 1 ? "（等 " + std::to_string(warnings_.size()) + " 条问题）" : ""));
+    Error(Tr("{first} ({n} issues in total)", {{"first", warnings_.front()}, {"n", std::to_string(warnings_.size())}}));
   Touch();
 }
 
@@ -56,29 +62,70 @@ void AppState::CycleDisplayCountry() {
                          [&](const Country& c) { return c.code == pref_.country; });
   it = (it == list.end() || std::next(it) == list.end()) ? list.begin() : std::next(it);
   pref_.country = it->code;
-  SavePreference();
+  if (SavePreference()) Info(Tr("Holiday config {n}", {{"n", std::to_string(HolidayConfigNumber(pref_.country))}}));
   Touch();
 }
 
-void AppState::CycleLanguage() {
-  const auto& list = SupportedLanguages();
-  if (list.size() <= 1) {
-    Info("目前只支持" + LanguageName(pref_.language));
+std::vector<std::string> AppState::AvailableLanguages() const {
+  std::vector<std::string> names;
+  std::error_code ec;
+  for (const auto& entry : fs::directory_iterator(language_dir_, ec))
+    if (entry.is_regular_file() && entry.path().extension() == ".json")
+      names.push_back(PathToUtf8(entry.path().stem()));
+  std::sort(names.begin(), names.end());
+  return names;
+}
+
+bool AppState::CycleLanguage() {
+  const std::vector<std::string> list = AvailableLanguages();
+  if (list.empty()) {
+    Error(Tr("No language files in {dir}", {{"dir", PathToUtf8(language_dir_)}}));
+    return false;
+  }
+  auto it = std::find(list.begin(), list.end(), pref_.language);
+  it = (it == list.end() || std::next(it) == list.end()) ? list.begin() : std::next(it);
+  if (*it == pref_.language) {
+    Info(Tr("Only one language is available: {language}", {{"language", Tr("English")}}));
+    return false;
+  }
+  pref_.language = *it;
+  std::vector<std::string> warnings;
+  LoadLanguage(&warnings);
+  if (!warnings.empty()) Error(warnings.front());
+  else if (SavePreference()) Info(Tr("Language: {language}", {{"language", Tr("English")}}));
+  Touch();
+  return true;
+}
+
+void AppState::LoadLanguage(std::vector<std::string>* warnings) {
+  if (!warnings) warnings = &warnings_;
+  SetTranslations({});  // 英文，也是加载失败时的回退
+  const fs::path file = language_dir_ / PathFromUtf8(pref_.language + ".json");
+  std::error_code ec;
+  if (language_dir_.empty() || !fs::exists(file, ec)) {
+    if (pref_.language != kDefaultLanguage)
+      warnings->push_back(Tr("Language file {file} not found, using English", {{"file", PathToUtf8(file)}}));
     return;
   }
-  auto it = std::find_if(list.begin(), list.end(),
-                         [&](const Language& l) { return l.code == pref_.language; });
-  it = (it == list.end() || std::next(it) == list.end()) ? list.begin() : std::next(it);
-  pref_.language = it->code;
-  SavePreference();
-  Touch();
+  auto text = ReadTextFile(file);
+  if (!text) {
+    warnings->push_back(text.error());
+    return;
+  }
+  auto t = ParseTranslations(*text);
+  if (!t) {
+    warnings->push_back(Tr("Language file {file}: {error}", {{"file", PathToUtf8(file.filename())}, {"error", t.error()}}));
+    return;
+  }
+  SetTranslations(std::move(*t));
 }
 
-void AppState::SavePreference() {
-  if (auto r = repo_.SavePreference(pref_); !r)
-    Error("配置保存失败：" + r.error());
-  else
-    Info("已切换：国家 " + CountryName(pref_.country) + "，语言 " + LanguageName(pref_.language));
+bool AppState::SavePreference() {
+  if (auto r = repo_.SavePreference(pref_); !r) {
+    Error(Tr("Failed to save preference: {error}", {{"error", r.error()}}));
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------- 查询
@@ -154,7 +201,7 @@ MonthDays& AppState::MonthOf(Date d) {
 Result AppState::SaveMonthOf(Date d) {
   const std::pair<int, unsigned> key{YearNum(d), MonthNum(d)};
   if (broken_months_.contains(key))
-    return std::unexpected("该月数据文件读取失败，为避免覆盖已拒绝保存，请先修复文件");
+    return std::unexpected(Tr("This month's data file failed to load; saving was refused to avoid overwriting it. Please fix the file first."));
   return repo_.SaveMonth(key.first, key.second, MonthOf(d));
 }
 
@@ -177,7 +224,7 @@ Result AppState::UpdateEvent(Date d, size_t index, Event e) {
   if (auto err = ValidateEvent(e)) return std::unexpected(*err);
   MonthDays& month = MonthOf(d);
   const auto it = month.find(d);
-  if (it == month.end() || index >= it->second.events.size()) return std::unexpected("事件不存在");
+  if (it == month.end() || index >= it->second.events.size()) return std::unexpected(Tr("Event not found"));
   const MonthDays backup = month;
   it->second.events[index] = std::move(e);
   SortEvents(it->second.events);
@@ -192,7 +239,7 @@ Result AppState::UpdateEvent(Date d, size_t index, Event e) {
 Result AppState::DeleteEvent(Date d, size_t index) {
   MonthDays& month = MonthOf(d);
   const auto it = month.find(d);
-  if (it == month.end() || index >= it->second.events.size()) return std::unexpected("事件不存在");
+  if (it == month.end() || index >= it->second.events.size()) return std::unexpected(Tr("Event not found"));
   const MonthDays backup = month;
   it->second.events.erase(it->second.events.begin() + static_cast<long>(index));
   if (it->second.Empty()) month.erase(it);
@@ -247,8 +294,8 @@ Result AppState::CreateTask(const TaskSpec& spec) {
 
 Result AppState::ModifyTask(const std::string& id, const TaskSpec& spec) {
   TaskEntry* entry = FindTaskMutable(id);
-  if (!entry) return std::unexpected("任务不存在");
-  if (entry->state.ended) return std::unexpected("任务已结束，不能修改");
+  if (!entry) return std::unexpected(Tr("Task not found"));
+  if (entry->state.ended) return std::unexpected(Tr("The task has ended and cannot be modified"));
   if (auto err = ValidateSpec(spec, today_, holidays_)) return std::unexpected(*err);
   Task updated = entry->task;
   if (!AppendModify(updated, entry->state.spec, spec, NowTimestamp())) return {};
@@ -257,12 +304,12 @@ Result AppState::ModifyTask(const std::string& id, const TaskSpec& spec) {
 
 Result AppState::ChangeTaskStatus(const std::string& id, std::string_view op) {
   TaskEntry* entry = FindTaskMutable(id);
-  if (!entry) return std::unexpected("任务不存在");
+  if (!entry) return std::unexpected(Tr("Task not found"));
   const TaskStatus s = entry->state.status;
   const bool ok = (op == "pause" && s == TaskStatus::kActive) ||
                   (op == "resume" && s == TaskStatus::kPaused) ||
                   ((op == "complete" || op == "abort") && !entry->state.ended);
-  if (!ok) return std::unexpected("当前状态下不能执行该操作");
+  if (!ok) return std::unexpected(Tr("This operation is not allowed in the current state"));
   Task updated = entry->task;
   AppendOp(updated, op, NowTimestamp());
   return CommitTask(*entry, std::move(updated));
@@ -270,11 +317,11 @@ Result AppState::ChangeTaskStatus(const std::string& id, std::string_view op) {
 
 Result AppState::SetProgress(const std::string& id, Date d, const DayProgress& p) {
   TaskEntry* entry = FindTaskMutable(id);
-  if (!entry) return std::unexpected("任务不存在");
-  if (d > today_) return std::unexpected("不能录入未来日期的工作量");
-  if (d < entry->state.created) return std::unexpected("该日期早于任务创建日期");
-  if (entry->state.ended && d > *entry->state.ended) return std::unexpected("任务已在该日期前结束");
-  if (p.minutes < 0) return std::unexpected("工作量不能为负");
+  if (!entry) return std::unexpected(Tr("Task not found"));
+  if (d > today_) return std::unexpected(Tr("Cannot record work for a future date"));
+  if (d < entry->state.created) return std::unexpected(Tr("The date is earlier than the task's creation date"));
+  if (entry->state.ended && d > *entry->state.ended) return std::unexpected(Tr("The task ended before this date"));
+  if (p.minutes < 0) return std::unexpected(Tr("Work time cannot be negative"));
   if (entry->state.ProgressOn(d) == p) return {};
   Task updated = entry->task;
   AppendProgress(updated, d, p, NowTimestamp());
@@ -284,7 +331,7 @@ Result AppState::SetProgress(const std::string& id, Date d, const DayProgress& p
 Result AppState::DeleteTask(const std::string& id) {
   const auto it = std::find_if(tasks_.begin(), tasks_.end(),
                                [&](const TaskEntry& e) { return e.task.id == id; });
-  if (it == tasks_.end()) return std::unexpected("任务不存在");
+  if (it == tasks_.end()) return std::unexpected(Tr("Task not found"));
   if (auto r = repo_.DeleteTask(it->task); !r) return r;
   tasks_.erase(it);
   Touch();
@@ -333,7 +380,7 @@ Result AppState::AddFixed(FixedSchedule f) {
 Result AppState::DeleteFixed(const std::string& id) {
   const auto it = std::find_if(fixed_.begin(), fixed_.end(),
                                [&](const FixedSchedule& f) { return f.id == id; });
-  if (it == fixed_.end()) return std::unexpected("固定日程不存在");
+  if (it == fixed_.end()) return std::unexpected(Tr("Fixed schedule not found"));
   if (auto r = repo_.DeleteFixed(*it); !r) return r;
   fixed_.erase(it);
   fixed_months_.clear();
@@ -347,7 +394,7 @@ Result AppState::ImportHolidays(const fs::path& file, const std::string& country
   auto text = ReadTextFile(file);
   if (!text) return std::unexpected(text.error());
   auto hy = ParseHolidayYear(*text, country, year);
-  if (!hy) return std::unexpected("格式错误：" + hy.error());
+  if (!hy) return std::unexpected(Tr("Format error: {error}", {{"error", hy.error()}}));
   if (auto r = repo_.SaveHolidayYear(*hy); !r) return r;
   holidays_.Set(std::move(*hy));
   RecomputePlans();

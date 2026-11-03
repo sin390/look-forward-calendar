@@ -36,7 +36,7 @@ std::vector<ftxui::Event> ParseKeys(const std::string& spec) {
 }  // namespace
 
 // 用法：LookForward [--data <数据目录>] [--snapshot <宽>x<高> [按键序列]]
-// 默认数据目录为 exe 所在目录下的 data/
+// 默认数据目录为 exe 所在目录下的 data/，语言文件在 exe 所在目录下的 language/
 int main(int argc, char** argv) {
   cal::InitConsole();
   cal::fs::path root = cal::ExeDir() / "data";
@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  cal::AppState state(root);
+  cal::AppState state(root, cal::ExeDir() / "language");
   if (!snapshot.empty()) {
     int w = 160, h = 45;
     std::sscanf(snapshot.c_str(), "%dx%d", &w, &h);

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(LFCalendar VERSION 1.3.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
+project(LFCalendar VERSION 1.4.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +23,7 @@ add_library(calendar_core STATIC
   src/core/date.cpp
   src/core/lunar.cpp
   src/core/holiday.cpp
+  src/core/i18n.cpp
   src/model/day.cpp
   src/model/task.cpp
   src/model/fixed.cpp
@@ -64,9 +65,16 @@ if(MINGW)
   target_link_options(LookForward PRIVATE -static)
 endif()
 
+# 语言文件复制到 exe 旁边的 language/
+add_custom_command(TARGET LookForward POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/language $<TARGET_FILE_DIR:LookForward>/language
+)
+
 enable_testing()
 add_executable(calendar_tests tests/test_main.cpp)
 target_link_libraries(calendar_tests PRIVATE calendar_core)
+# 单元测试检查语言文件是否完整
+target_compile_definitions(calendar_tests PRIVATE LANGUAGE_DIR="${CMAKE_SOURCE_DIR}/language")
 if(MINGW)
   target_link_options(calendar_tests PRIVATE -static)
 endif()

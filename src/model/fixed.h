@@ -36,8 +36,8 @@ std::expected<FixedSchedule, std::string> FixedFromJson(const Json& j, std::stri
 
 std::optional<std::string> ValidateFixed(const FixedSchedule& f);  // 返回错误信息
 
-std::string RepeatName(Repeat r);  // "每天" / "每周" / "每两周" / "每月"
-// "每周一三 · 2026-11-03 起" / "每月 3 日 · 2026-11-03 至 2027-06-30"
+std::string RepeatName(Repeat r);  // "Weekly"（中文：每周）
+// "Weekly Mo We · from 2026-11-03"（中文：每周一三 · 2026-11-03 起）
 std::string RepeatText(const FixedSchedule& f);
 
 }  // namespace cal

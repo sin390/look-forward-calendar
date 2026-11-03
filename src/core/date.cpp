@@ -1,5 +1,7 @@
 #include "core/date.h"
 
+#include "core/i18n.h"
+
 #include <algorithm>
 #include <charconv>
 #include <cstdlib>
@@ -137,11 +139,11 @@ std::optional<int> ParseLeadTime(std::string_view s) {
 }
 
 std::string FormatLead(int minutes) {
-  if (minutes == 0) return "准时";
-  if (minutes % 1440 == 0) return std::to_string(minutes / 1440) + "天";
+  if (minutes == 0) return Tr("on time");
+  if (minutes % 1440 == 0) return Tr("{n} d", {{"n", std::to_string(minutes / 1440)}});
   std::string s;
-  if (minutes >= 60) s += std::to_string(minutes / 60) + "小时";
-  if (minutes % 60) s += std::to_string(minutes % 60) + "分钟";
+  if (minutes >= 60) s += Tr("{n} h", {{"n", std::to_string(minutes / 60)}});
+  if (minutes % 60) s += (s.empty() ? "" : Tr(" ")) + Tr("{n} min", {{"n", std::to_string(minutes % 60)}});
   return s;
 }
 

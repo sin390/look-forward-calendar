@@ -5,11 +5,13 @@
 
 #include "core/date.h"
 #include "core/holiday.h"
+#include "core/i18n.h"
 #include "core/lunar.h"
 #include "model/day.h"
 #include "model/fixed.h"
 #include "model/preference.h"
 #include "model/task.h"
+#include "store/fs_util.h"
 
 using namespace cal;
 
@@ -92,7 +94,7 @@ void TestHoliday() {
   CHECK(!cal.Has("CN", 2027));
   // 代码块前后带说明文字时也能取出 JSON
   CHECK(ParseHolidayYear(std::string("好的，如下：\n") + text + "\n以上为官方安排。", "CN", 2026).has_value());
-  CHECK(HolidayPrompt("JP", 2027).find("日本2027年") != std::string::npos);
+  CHECK(HolidayPrompt("JP", 2027).find("Japan for the year 2027") != std::string::npos);
   CHECK(HolidayPrompt("JP", 2027).find("JP_2027.json") != std::string::npos);
 }
 
@@ -170,11 +172,11 @@ void TestTask() {
   CHECK(ValidateSpec(cross, D("2026-11-02"), cal).has_value());
 
   // 日志描述
-  CHECK(DescribeLogEntry(t2.log.front()).starts_with("创建："));
-  CHECK(DescribeLogEntry(t2.log[1]) == "修改：截止 → 2026-11-30");
-  CHECK(DescribeLogEntry(t.log[1]) == "进行 2026-11-02：1:00");
-  CHECK(DescribeLogEntry(t.log[2]) == "进行 2026-11-02：0:10，内容：写了引言");
-  CHECK(DescribeLogEntry(t2.log[2]) == "暂停");
+  CHECK(DescribeLogEntry(t2.log.front()).starts_with("Created: "));
+  CHECK(DescribeLogEntry(t2.log[1]) == "Modified: Due → 2026-11-30");
+  CHECK(DescribeLogEntry(t.log[1]) == "Progress 2026-11-02: 1:00");
+  CHECK(DescribeLogEntry(t.log[2]) == "Progress 2026-11-02: 0:10, note: 写了引言");
+  CHECK(DescribeLogEntry(t2.log[2]) == "Pause");
 
   // 序列化往返
   auto back = TaskFromJson(ToJson(t2), t2.file_stem);
@@ -185,8 +187,8 @@ void TestTask() {
 void TestReminder() {
   CHECK(ParseLeadTime("1d") == 1440);
   CHECK(ParseLeadTime("30m") == 30);
-  CHECK(FormatLead(90) == "1小时30分钟");
-  CHECK(FormatLead(2880) == "2天");
+  CHECK(FormatLead(90) == "1 h 30 min");
+  CHECK(FormatLead(2880) == "2 d");
 
   const Date d = D("2026-11-10");
   Event timed{"组会", "14:00", "15:30", "", 30};
@@ -258,7 +260,7 @@ void TestFixed() {
   CHECK(OccursOn(f, D("2026-12-31")));
   CHECK(!OccursOn(f, D("2026-11-30")));
   CHECK(!OccursOn(f, D("2026-12-30")));
-  CHECK(RepeatText(f) == "每月 31 日 · 2026-10-31 起");
+  CHECK(RepeatText(f) == "Monthly on day 31 · from 2026-10-31");
 
   // 序列化往返
   f.repeat = Repeat::kWeekly;
@@ -268,10 +270,10 @@ void TestFixed() {
   CHECK(back.has_value());
   CHECK(back && back->repeat == Repeat::kWeekly && back->weekdays == f.weekdays);
   CHECK(back && back->until == f.until && back->note == "带电脑" && back->file_stem == "20261103_b71c");
-  CHECK(RepeatText(f) == "每周二四 · 2026-10-31 至 2027-06-30");
+  CHECK(RepeatText(f) == "Weekly Tu Th · 2026-10-31 to 2027-06-30");
   // 星期按 日 一 … 六 的顺序显示
   f.weekdays[6] = true;
-  CHECK(WeekdaysText(f.weekdays) == "日二四");
+  CHECK(WeekdaysText(f.weekdays) == "Su Tu Th");
   f.weekdays[6] = false;
 
   // 校验
@@ -293,22 +295,84 @@ void TestFixed() {
 
 void TestPreference() {
   std::vector<std::string> warnings;
-  Preference p = PreferenceFromJson(Json{{"country", "JP"}, {"language", "zh-CN"}}, warnings);
-  CHECK(p.country == "JP" && p.language == "zh-CN" && warnings.empty());
+  Preference p = PreferenceFromJson(Json{{"country", "JP"}, {"language", "CN"}}, warnings);
+  CHECK(p.country == "JP" && p.language == "CN" && warnings.empty());
 
-  // 不支持的值回退为默认值并给出提示
-  p = PreferenceFromJson(Json{{"country", "XX"}, {"language", "fr"}}, warnings);
-  CHECK(p.country == "CN" && p.language == "zh-CN" && warnings.size() == 2);
+  // 不支持的国家回退为默认值并给出提示；语言文件是否存在在加载时检查
+  p = PreferenceFromJson(Json{{"country", "XX"}, {"language", "FR"}}, warnings);
+  CHECK(p.country == "CN" && p.language == "FR" && warnings.size() == 1);
 
-  // 缺少字段时使用默认值，不提示
+  // 缺少字段时使用默认值（英文），不提示
   warnings.clear();
   p = PreferenceFromJson(Json::object(), warnings);
-  CHECK(p.country == "CN" && warnings.empty());
+  CHECK(p.country == "CN" && p.language == "EN" && warnings.empty());
+
+  // v1.3.0 写入的 zh-CN 对应 CN.json
+  CHECK(PreferenceFromJson(Json{{"language", "zh-CN"}}, warnings).language == "CN");
 
   // 往返
   p.country = "JP";
   CHECK(PreferenceFromJson(ToJson(p), warnings).country == "JP");
-  CHECK(LanguageName("zh-CN") == "中文");
+}
+
+Translations LoadLanguageFile(const char* name) {
+  const auto text = ReadTextFile(PathFromUtf8(std::string(LANGUAGE_DIR) + "/" + name));
+  if (!text) return {};
+  auto t = ParseTranslations(*text);
+  return t ? *t : Translations{};
+}
+
+void TestI18n() {
+  // 占位符替换；没有译文时显示 key（英文）
+  SetTranslations({});
+  CHECK(Tr("Task created: {name}", {{"name", "A"}}) == "Task created: A");
+  CHECK(Tr("{a}-{a}", {{"a", "x"}}) == "x-x");
+  CHECK(!ParseTranslations("[1]").has_value());
+  CHECK(!ParseTranslations("{\"a\": 1}").has_value());
+
+  // EN.json 是模板：key 与 value 相同
+  const Translations en = LoadLanguageFile("EN.json");
+  CHECK(en.size() > 200);
+  bool identical = true;
+  for (const auto& [k, v] : en) identical = identical && k == v;
+  CHECK(identical);
+
+  // CN.json 覆盖 EN.json 的全部 key，占位符一致
+  const Translations cn = LoadLanguageFile("CN.json");
+  bool complete = true;
+  for (const auto& [k, _] : en) {
+    const auto it = cn.find(k);
+    if (it == cn.end()) {
+      std::printf("CN.json 缺少：%s\n", k.c_str());
+      complete = false;
+      continue;
+    }
+    for (size_t pos = 0; (pos = k.find('{', pos)) != std::string::npos; ++pos) {
+      const std::string ph = k.substr(pos, k.find('}', pos) - pos + 1);
+      // 月份标题的中文不使用 {month_name}；JSON 示例中的 { 不是占位符
+      if (ph == "{month_name}" || ph.find(' ') != std::string::npos || ph.find('\n') != std::string::npos) continue;
+      if (it->second.find(ph) == std::string::npos) {
+        std::printf("CN.json 缺少占位符 %s：%s\n", ph.c_str(), k.c_str());
+        complete = false;
+      }
+    }
+  }
+  CHECK(complete);
+
+  // 切换为中文
+  SetTranslations(cn);
+  FixedSchedule f;
+  f.repeat = Repeat::kWeekly;
+  f.from = D("2026-11-03");
+  f.weekdays[1] = f.weekdays[3] = f.weekdays[6] = true;
+  CHECK(RepeatText(f) == "每周日二四 · 2026-11-03 起");
+  f.repeat = Repeat::kMonthly;
+  f.until = D("2027-06-30");
+  CHECK(RepeatText(f) == "每月 3 日 · 2026-11-03 至 2027-06-30");
+  CHECK(FormatLead(90) == "1小时30分钟");
+  CHECK(HolidayPrompt("JP", 2027).find("日本2027年") != std::string::npos);
+  SetTranslations({});
+  CHECK(FormatLead(90) == "1 h 30 min");
 }
 
 int main() {
@@ -319,6 +383,7 @@ int main() {
   TestReminder();
   TestFixed();
   TestPreference();
+  TestI18n();
   std::printf("%d/%d passed\n", g_total - g_failed, g_total);
   return g_failed == 0 ? 0 : 1;
 }

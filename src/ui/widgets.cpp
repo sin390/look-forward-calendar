@@ -28,7 +28,7 @@ Element InputBox(Component input, int width) {
 }
 
 Element FormRow(const std::string& label, Element field) {
-  return hbox({text(label) | size(WIDTH, EQUAL, 12), std::move(field)});
+  return hbox({text(label) | size(WIDTH, EQUAL, 16), std::move(field)});
 }
 
 Element Panel(const std::string& title, Element body, bool focused) {
@@ -71,15 +71,21 @@ Element WrapText(std::string_view s) {
 }
 
 std::string WeekdayName(int iso_weekday) {
-  static constexpr std::array<const char*, 7> kNames = {"周一", "周二", "周三", "周四",
-                                                        "周五", "周六", "周日"};
-  return kNames[static_cast<size_t>(iso_weekday - 1)];
+  static constexpr std::array<const char*, 7> kNames = {N_("Mon"), N_("Tue"), N_("Wed"), N_("Thu"),
+                                                        N_("Fri"), N_("Sat"), N_("Sun")};
+  return Tr(kNames[static_cast<size_t>(iso_weekday - 1)]);
+}
+
+std::string WeekdayShortName(int iso_weekday) {
+  static constexpr std::array<const char*, 7> kNames = {N_("Mo"), N_("Tu"), N_("We"), N_("Th"),
+                                                        N_("Fr"), N_("Sa"), N_("Su")};
+  return Tr(kNames[static_cast<size_t>(iso_weekday - 1)]);
 }
 
 std::string IdTag(const std::string& task_id) { return "(ID:" + task_id + ")"; }
 
 std::string ShortDate(Date d) {
-  return std::to_string(MonthNum(d)) + "月" + std::to_string(DayNum(d)) + "日";
+  return Tr("{month}/{day}", {{"month", std::to_string(MonthNum(d))}, {"day", std::to_string(DayNum(d))}});
 }
 
 void Report(AppState& s, const Result& r, const std::string& ok_msg) {

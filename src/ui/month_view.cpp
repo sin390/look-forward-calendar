@@ -51,7 +51,7 @@ class MonthViewBase : public ComponentBase {
     Elements header;
     for (size_t c = 0; c < 7; ++c) {
       const int w = kDisplayWeekOrder[c];
-      auto t = CellSize(text(WeekdayName(w).substr(3)) | center);
+      auto t = CellSize(text(WeekdayShortName(w)) | center);
       if (w >= 6) t |= color(Color::RedLight);
       header.push_back(t);
       if (c < 6) header.push_back(separatorLight());
@@ -70,8 +70,14 @@ class MonthViewBase : public ComponentBase {
       rows.push_back(hbox(std::move(cells)));
     }
 
-    const std::string title = std::to_string(YearNum(sel)) + " 年 " + std::to_string(MonthNum(sel)) +
-                              " 月    节假日：" + CountryName(s_.display_country());
+    static constexpr std::array<const char*, 12> kMonths = {
+        N_("January"), N_("February"), N_("March"),     N_("April"),   N_("May"),      N_("June"),
+        N_("July"),    N_("August"),   N_("September"), N_("October"), N_("November"), N_("December")};
+    const std::string title = Tr("{month_name} {year}    Holiday config {n}",
+                                 {{"month_name", Tr(kMonths[MonthNum(sel) - 1])},
+                                  {"year", std::to_string(YearNum(sel))},
+                                  {"month", std::to_string(MonthNum(sel))},
+                                  {"n", std::to_string(HolidayConfigNumber(s_.display_country()))}});
     return Panel(title, vbox(std::move(rows)), Focused());
   }
 
@@ -88,9 +94,9 @@ class MonthViewBase : public ComponentBase {
     // 第 1 行：日期 + 休/班标记
     auto num = text(std::to_string(DayNum(d))) | bold;
     if ((holiday && holiday->off) || (weekend && !holiday)) num |= color(Color::RedLight);
-    if (d == today) num = text(std::to_string(DayNum(d)) + "今") | bold | color(Color::Cyan);
+    if (d == today) num = text(std::to_string(DayNum(d)) + Tr("*")) | bold | color(Color::Cyan);
     Element mark = text("");
-    if (holiday) mark = holiday->off ? text("休") | color(Color::Red) : text("班") | color(Color::Blue);
+    if (holiday) mark = holiday->off ? text(Tr("Off")) | color(Color::Red) : text(Tr("Work")) | color(Color::Blue);
     auto line1 = hbox({num, filler(), mark});
 
     // 第 2 行：节假日名 > 农历节日 > 节气 > 农历日

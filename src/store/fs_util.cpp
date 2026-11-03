@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "core/i18n.h"
+
 namespace cal {
 
 fs::path PathFromUtf8(std::string_view s) {
@@ -16,7 +18,7 @@ std::string PathToUtf8(const fs::path& p) {
 
 std::expected<std::string, std::string> ReadTextFile(const fs::path& p) {
   std::ifstream in(p, std::ios::binary);
-  if (!in) return std::unexpected("无法打开文件：" + PathToUtf8(p));
+  if (!in) return std::unexpected(Tr("Cannot open file: {path}", {{"path", PathToUtf8(p)}}));
   std::ostringstream ss;
   ss << in.rdbuf();
   std::string s = ss.str();
@@ -27,18 +29,18 @@ std::expected<std::string, std::string> ReadTextFile(const fs::path& p) {
 std::expected<void, std::string> WriteTextFileAtomic(const fs::path& p, const std::string& content) {
   std::error_code ec;
   fs::create_directories(p.parent_path(), ec);
-  if (ec) return std::unexpected("无法创建目录：" + PathToUtf8(p.parent_path()));
+  if (ec) return std::unexpected(Tr("Cannot create directory: {path}", {{"path", PathToUtf8(p.parent_path())}}));
 
   fs::path tmp = p;
   tmp += ".tmp";
   {
     std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-    if (!out) return std::unexpected("无法写入文件：" + PathToUtf8(tmp));
+    if (!out) return std::unexpected(Tr("Cannot write file: {path}", {{"path", PathToUtf8(tmp)}}));
     out << content;
-    if (!out) return std::unexpected("写入失败：" + PathToUtf8(tmp));
+    if (!out) return std::unexpected(Tr("Write failed: {path}", {{"path", PathToUtf8(tmp)}}));
   }
   fs::rename(tmp, p, ec);
-  if (ec) return std::unexpected("无法替换文件：" + PathToUtf8(p));
+  if (ec) return std::unexpected(Tr("Cannot replace file: {path}", {{"path", PathToUtf8(p)}}));
   return {};
 }
 

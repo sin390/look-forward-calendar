@@ -2,11 +2,14 @@
 
 #include <algorithm>
 
+#include "core/i18n.h"
+
 namespace cal {
 
 namespace {
 
-constexpr std::array<const char*, 7> kWeekdayNames = {"一", "二", "三", "四", "五", "六", "日"};
+constexpr std::array<const char*, 7> kWeekdayNames = {N_("Mo"), N_("Tu"), N_("We"), N_("Th"),
+                                                      N_("Fr"), N_("Sa"), N_("Su")};
 
 std::optional<Date> DateOfTimestamp(const std::string& at) {
   return at.size() >= 10 ? ParseDate(std::string_view(at).substr(0, 10)) : std::nullopt;
@@ -37,21 +40,21 @@ std::optional<std::string> ApplySpecFields(TaskSpec& spec, const Json& f) {
     if (f.contains("total_minutes")) spec.total_minutes = f["total_minutes"].get<int>();
     if (f.contains("due")) {
       const auto d = ParseDate(f["due"].get<std::string>());
-      if (!d) return "due 日期非法";
+      if (!d) return Tr("invalid due date");
       spec.due = *d;
     }
     if (f.contains("weekdays")) {
       spec.weekdays = {};
       for (const Json& w : f["weekdays"]) {
         const int i = w.get<int>();
-        if (i < 1 || i > 7) return "weekdays 取值应为 1..7";
+        if (i < 1 || i > 7) return Tr("weekdays values must be 1..7");
         spec.weekdays[static_cast<size_t>(i - 1)] = true;
       }
     }
     if (f.contains("skip_holiday")) spec.skip_holiday = f["skip_holiday"].get<bool>();
     if (f.contains("country")) spec.country = f["country"].get<std::string>();
   } catch (const nlohmann::json::exception&) {
-    return "任务属性字段类型错误";
+    return Tr("wrong type in task fields");
   }
   return std::nullopt;
 }
@@ -109,9 +112,9 @@ Json ToJson(const Task& task) {
 }
 
 std::expected<Task, std::string> TaskFromJson(const Json& j, std::string file_stem) {
-  if (!j.is_object()) return std::unexpected("顶层必须是对象");
-  if (!j.contains("id") || !j["id"].is_string()) return std::unexpected("缺少 id");
-  if (!j.contains("log") || !j["log"].is_array()) return std::unexpected("缺少 log");
+  if (!j.is_object()) return std::unexpected(Tr("top level must be an object"));
+  if (!j.contains("id") || !j["id"].is_string()) return std::unexpected(Tr("missing id"));
+  if (!j.contains("log") || !j["log"].is_array()) return std::unexpected(Tr("missing log"));
   Task t;
   t.id = j["id"].get<std::string>();
   t.name = j.value("name", "");
@@ -122,29 +125,29 @@ std::expected<Task, std::string> TaskFromJson(const Json& j, std::string file_st
 
 std::expected<TaskState, std::string> Replay(const Task& task) {
   if (task.log.empty() || !task.log.front().is_object() || task.log.front().value("op", "") != "create")
-    return std::unexpected("日志的第一条必须是 create");
+    return std::unexpected(Tr("the first log entry must be create"));
 
   TaskState s;
   for (size_t i = 0; i < task.log.size(); ++i) {
     const Json& e = task.log[i];
     const std::string where = "log[" + std::to_string(i) + "]";
     if (!e.is_object() || !e.contains("op") || !e["op"].is_string())
-      return std::unexpected(where + " 缺少 op");
+      return std::unexpected(Tr("{where} is missing op", {{"where", where}}));
     const auto at = DateOfTimestamp(e.value("at", ""));
-    if (!at) return std::unexpected(where + " 的 at 时间戳非法");
+    if (!at) return std::unexpected(Tr("{where}: invalid at timestamp", {{"where", where}}));
     const std::string op = e["op"].get<std::string>();
 
     if (op == "create") {
-      if (i != 0) return std::unexpected(where + " 重复的 create");
+      if (i != 0) return std::unexpected(Tr("{where}: duplicate create", {{"where", where}}));
       if (auto err = ApplySpecFields(s.spec, e)) return std::unexpected(where + " " + *err);
       s.created = *at;
     } else if (op == "modify") {
-      if (!e.contains("fields") || !e["fields"].is_object()) return std::unexpected(where + " 缺少 fields");
+      if (!e.contains("fields") || !e["fields"].is_object()) return std::unexpected(Tr("{where} is missing fields", {{"where", where}}));
       if (auto err = ApplySpecFields(s.spec, e["fields"])) return std::unexpected(where + " " + *err);
     } else if (op == "progress") {
       const auto d = ParseDate(e.value("date", ""));
       if (!d || !e.contains("minutes") || !e["minutes"].is_number_integer())
-        return std::unexpected(where + " progress 字段非法");
+        return std::unexpected(Tr("{where}: invalid progress fields", {{"where", where}}));
       DayProgress p{e["minutes"].get<int>(), e.value("note", "")};
       if (p.minutes > 0 || !p.note.empty()) s.progress[*d] = std::move(p);
       else s.progress.erase(*d);
@@ -156,7 +159,7 @@ std::expected<TaskState, std::string> Replay(const Task& task) {
       s.status = op == "complete" ? TaskStatus::kCompleted : TaskStatus::kAborted;
       s.ended = *at;
     } else {
-      return std::unexpected(where + " 未知的 op：" + op);
+      return std::unexpected(Tr("{where}: unknown op: {op}", {{"where", where}, {"op", op}}));
     }
   }
   return s;
@@ -198,87 +201,90 @@ bool ShowsOn(const TaskState& state, Date d, Date today) {
 }
 
 std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today, const HolidayCalendar& holidays) {
-  if (Trim(spec.name).empty()) return "任务名不能为空";
-  if (spec.total_minutes <= 0) return "预定时长必须大于 0";
-  if (!spec.due.ok()) return "完成日期非法";
-  if (spec.due < today) return "完成日期不能早于今天";
+  if (Trim(spec.name).empty()) return Tr("Task name cannot be empty");
+  if (spec.total_minutes <= 0) return Tr("Planned hours must be greater than 0");
+  if (!spec.due.ok()) return Tr("Invalid due date");
+  if (spec.due < today) return Tr("Due date cannot be earlier than today");
   if (std::none_of(spec.weekdays.begin(), spec.weekdays.end(), [](bool b) { return b; }))
-    return "至少选择一个工作日";
+    return Tr("Select at least one workday");
   if (spec.skip_holiday) {
     for (int y = YearNum(today); y <= YearNum(spec.due); ++y)
       if (!holidays.Has(spec.country, y))
-        return "缺少 " + CountryName(spec.country) + " " + std::to_string(y) +
-               " 年的节假日数据，已取消。请先按 i 导入。";
+        return Tr("Missing {country} holiday data for {year}; cancelled. Press i to import it first.",
+                  {{"country", CountryName(spec.country)}, {"year", std::to_string(y)}});
   }
   return std::nullopt;
 }
 
 namespace {
 
-// 把 create / modify 中的属性字段描述为 "名称 X，总时长 40:00，……"
+// 把 create / modify 中的属性字段描述为 "Name X, Total 40:00, ..."（中文：名称 X，总时长 40:00，……）
 std::string DescribeSpecFields(const Json& f, const char* arrow) {
   std::vector<std::string> parts;
   try {
-    if (f.contains("name")) parts.push_back("名称" + std::string(arrow) + f["name"].get<std::string>());
+    if (f.contains("name")) parts.push_back(Tr("Name") + arrow + f["name"].get<std::string>());
     if (f.contains("total_minutes"))
-      parts.push_back("总时长" + std::string(arrow) + FormatMinutes(f["total_minutes"].get<int>()));
-    if (f.contains("due")) parts.push_back("截止" + std::string(arrow) + f["due"].get<std::string>());
+      parts.push_back(Tr("Total") + arrow + FormatMinutes(f["total_minutes"].get<int>()));
+    if (f.contains("due")) parts.push_back(Tr("Due") + arrow + f["due"].get<std::string>());
     if (f.contains("weekdays")) {
       std::array<bool, 7> wd{};
       for (const Json& w : f["weekdays"])
         if (const int i = w.get<int>(); i >= 1 && i <= 7) wd[static_cast<size_t>(i - 1)] = true;
-      parts.push_back("每周" + std::string(arrow) + WeekdaysText(wd));
+      parts.push_back(Tr("Weekly") + arrow + WeekdaysText(wd));
     }
     if (f.contains("skip_holiday"))
-      parts.push_back(f["skip_holiday"].get<bool>() ? "跳过节假日" : "不跳过节假日");
-    if (f.contains("country")) parts.push_back("节假日国家" + std::string(arrow) + CountryName(f["country"].get<std::string>()));
+      parts.push_back(f["skip_holiday"].get<bool>() ? Tr("Skip holidays") : Tr("Don't skip holidays"));
+    if (f.contains("country")) parts.push_back(Tr("Holiday country") + arrow + CountryName(f["country"].get<std::string>()));
   } catch (const nlohmann::json::exception&) {
-    parts.push_back("（字段格式错误）");
+    parts.push_back(Tr("(invalid field format)"));
   }
   std::string s;
-  for (const std::string& p : parts) s += (s.empty() ? "" : "，") + p;
+  for (const std::string& p : parts) s += (s.empty() ? "" : Tr(", ")) + p;
   return s;
 }
 
 }  // namespace
 
 std::string DescribeLogEntry(const Json& e) {
-  if (!e.is_object()) return "（无法识别的条目）";
+  if (!e.is_object()) return Tr("(unrecognized entry)");
   const std::string op = e.value("op", "");
-  if (op == "create") return "创建：" + DescribeSpecFields(e, " ");
+  if (op == "create") return Tr("Created: {fields}", {{"fields", DescribeSpecFields(e, " ")}});
   if (op == "modify")
-    return "修改：" + (e.contains("fields") ? DescribeSpecFields(e["fields"], " → ") : std::string());
+    return Tr("Modified: {fields}",
+              {{"fields", e.contains("fields") ? DescribeSpecFields(e["fields"], " → ") : std::string()}});
   if (op == "progress") {
     const int m = e.value("minutes", 0);
     const std::string note = e.value("note", "");
     const std::string date = e.value("date", "");
-    if (m <= 0 && note.empty()) return "清除 " + date + " 的进行记录";
-    return "进行 " + date + "：" + FormatMinutes(m) + (note.empty() ? "" : "，内容：" + note);
+    if (m <= 0 && note.empty()) return Tr("Cleared progress for {date}", {{"date", date}});
+    return Tr("Progress {date}: {minutes}", {{"date", date}, {"minutes", FormatMinutes(m)}}) +
+           (note.empty() ? "" : Tr(", note: {note}", {{"note", note}}));
   }
-  if (op == "pause") return "暂停";
-  if (op == "resume") return "恢复";
-  if (op == "complete") return "完成";
-  if (op == "abort") return "中止";
-  return "未知操作：" + op;
+  if (op == "pause") return Tr("Pause");
+  if (op == "resume") return Tr("Resume");
+  if (op == "complete") return Tr("Done");
+  if (op == "abort") return Tr("Abort");
+  return Tr("Unknown operation: {op}", {{"op", op}});
 }
 
 std::string WeekdaysText(const std::array<bool, 7>& weekdays) {
   std::string s;
   for (int w : kDisplayWeekOrder)
-    if (weekdays[static_cast<size_t>(w - 1)]) s += kWeekdayNames[static_cast<size_t>(w - 1)];
+    if (weekdays[static_cast<size_t>(w - 1)])
+      s += (s.empty() ? "" : Tr(" ")) + Tr(kWeekdayNames[static_cast<size_t>(w - 1)]);
   return s;
 }
 
 std::string StatusText(const TaskState& state, const TaskPlan& plan, Date today) {
   switch (state.status) {
-    case TaskStatus::kCompleted: return "已完成";
-    case TaskStatus::kAborted: return "已中止";
-    case TaskStatus::kPaused: return "暂停";
+    case TaskStatus::kCompleted: return Tr("Completed");
+    case TaskStatus::kAborted: return Tr("Aborted");
+    case TaskStatus::kPaused: return Tr("Paused");
     case TaskStatus::kActive: break;
   }
-  if (plan.overdue) return today > state.spec.due ? "超期" : "无工作日";
-  if (plan.remaining <= 0) return "时长已满";
-  return "进行中";
+  if (plan.overdue) return today > state.spec.due ? Tr("Overdue") : Tr("No workdays");
+  if (plan.remaining <= 0) return Tr("Hours met");
+  return Tr("Active");
 }
 
 }  // namespace cal

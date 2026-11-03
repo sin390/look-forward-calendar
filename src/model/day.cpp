@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "core/i18n.h"
+
 namespace cal {
 
 namespace {
@@ -42,12 +44,12 @@ Json ToJson(const MonthDays& month) {
 }
 
 std::expected<MonthDays, std::string> MonthDaysFromJson(const Json& j) {
-  if (!j.is_object()) return std::unexpected("顶层必须是对象");
+  if (!j.is_object()) return std::unexpected(Tr("top level must be an object"));
   MonthDays month;
   for (const auto& [key, value] : j.items()) {
     const auto date = ParseDate(key);
-    if (!date) return std::unexpected("非法日期键：" + key);
-    if (!value.is_object()) return std::unexpected(key + " 不是对象");
+    if (!date) return std::unexpected(Tr("invalid date key: {key}", {{"key", key}}));
+    if (!value.is_object()) return std::unexpected(Tr("{key} is not an object", {{"key", key}}));
     Day day;
     if (const auto it = value.find("events"); it != value.end() && it->is_array()) {
       for (const Json& e : *it) {
@@ -65,12 +67,12 @@ std::expected<MonthDays, std::string> MonthDaysFromJson(const Json& j) {
 }
 
 std::optional<std::string> ValidateEvent(const Event& e) {
-  if (Trim(e.title).empty()) return "标题不能为空";
-  if (!e.start.empty() && !IsTime(e.start)) return "开始时间格式应为 HH:MM";
-  if (!e.end.empty() && !IsTime(e.end)) return "结束时间格式应为 HH:MM";
-  if (!e.end.empty() && e.start.empty()) return "填写结束时间时必须填写开始时间";
-  if (!e.end.empty() && e.end < e.start) return "结束时间早于开始时间";
-  if (e.remind && (*e.remind < 0 || *e.remind > kMaxRemindMinutes)) return "提醒提前量应在 0 到 30 天之间";
+  if (Trim(e.title).empty()) return Tr("Title cannot be empty");
+  if (!e.start.empty() && !IsTime(e.start)) return Tr("Start time must be HH:MM");
+  if (!e.end.empty() && !IsTime(e.end)) return Tr("End time must be HH:MM");
+  if (!e.end.empty() && e.start.empty()) return Tr("A start time is required when an end time is given");
+  if (!e.end.empty() && e.end < e.start) return Tr("End time is earlier than start time");
+  if (e.remind && (*e.remind < 0 || *e.remind > kMaxRemindMinutes)) return Tr("Reminder lead time must be between 0 and 30 days");
   return std::nullopt;
 }
 

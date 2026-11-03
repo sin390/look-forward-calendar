@@ -94,7 +94,7 @@ std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today,
 // 日志条目 → 可读文字，如 "修改：截止日期 → 2027-01-10"
 std::string DescribeLogEntry(const Json& entry);
 
-std::string WeekdaysText(const std::array<bool, 7>& weekdays);  // "一二三四五"
+std::string WeekdaysText(const std::array<bool, 7>& weekdays);  // "Mo Tu We"（中文：一二三）
 std::string StatusText(const TaskState& state, const TaskPlan& plan, Date today);
 
 }  // namespace cal

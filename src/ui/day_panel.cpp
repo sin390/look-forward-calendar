@@ -55,15 +55,17 @@ class DayPanelBase : public ComponentBase {
     const Date d = s_.selected();
     Elements lines;
     if (const auto ld = ToLunar(d)) {
-      lines.push_back(text("农历 " + GanzhiYear(ld->year) + Zodiac(ld->year) + "年 " +
-                           LunarMonthName(*ld) + LunarDayName(ld->day)));
+      lines.push_back(text(Tr("Lunar: {ganzhi}{zodiac} year, {month}{day}",
+                              {{"ganzhi", GanzhiYear(ld->year)}, {"zodiac", Zodiac(ld->year)},
+                               {"month", LunarMonthName(*ld)}, {"day", LunarDayName(ld->day)}})));
       std::string extra = LunarFestival(*ld);
       if (auto t = SolarTerm(d); !t.empty()) extra += (extra.empty() ? "" : " ") + t;
       if (!extra.empty()) lines.push_back(WrapText(extra) | color(Color::Yellow));
     }
     for (const Country& c : SupportedCountries()) {
       if (const HolidayDay* h = s_.holidays().Find(c.code, d))
-        lines.push_back(WrapText(c.name + "：" + h->name + (h->off ? "（休）" : "（班）")) |
+        lines.push_back(WrapText(h->off ? Tr("{country}: {holiday} (off)", {{"country", CountryName(c.code)}, {"holiday", h->name}})
+                                        : Tr("{country}: {holiday} (workday)", {{"country", CountryName(c.code)}, {"holiday", h->name}})) |
                         color(h->off ? Color::Red : Color::Blue));
     }
     return vbox(std::move(lines));
@@ -76,41 +78,41 @@ class DayPanelBase : public ComponentBase {
     Components rows;
 
     // ---- 瞬间型事件 ----
-    rows.push_back(Renderer([] { return text("【事件】") | bold; }));
+    rows.push_back(Renderer([] { return text(Tr("[Events]")) | bold; }));
     if (const Day* day = s_.FindDay(d)) {
       for (size_t i = 0; i < day->events.size(); ++i) {
         const cal::Event ev = day->events[i];
-        auto edit = Button("改", [this, d, i] { actions_.edit_event(d, i); }, SmallButton());
-        auto del = Button("删", [this, d, i] { Report(s_, s_.DeleteEvent(d, i), "已删除事件"); },
+        auto edit = Button(Tr("Edit"), [this, d, i] { actions_.edit_event(d, i); }, SmallButton());
+        auto del = Button(Tr("Del"), [this, d, i] { Report(s_, s_.DeleteEvent(d, i), Tr("Event deleted")); },
                           SmallButton());
         auto row = Container::Horizontal({edit, del});
         rows.push_back(Renderer(row, [ev, edit, del] {
-          Elements left = {text(EventTimeText(ev).empty() ? "全天" : EventTimeText(ev)) |
+          Elements left = {text(EventTimeText(ev).empty() ? Tr("All day") : EventTimeText(ev)) |
                                color(Color::Magenta) | size(WIDTH, EQUAL, 12),
                            WrapText(ev.title) | flex};
           auto top = hbox({hbox(std::move(left)) | flex, edit->Render(), del->Render()});
           Elements lines = {top};
-          if (ev.remind) lines.push_back(text("  ⏰ 提前" + FormatLead(*ev.remind)) | color(Color::Yellow));
+          if (ev.remind) lines.push_back(text(Tr("  ⏰ {lead} before", {{"lead", FormatLead(*ev.remind)}})) | color(Color::Yellow));
           if (!ev.note.empty()) lines.push_back(hbox({text("  "), WrapText(ev.note) | flex}) | dim);
           return vbox(std::move(lines));
         }));
       }
     }
-    rows.push_back(Button("+ 新建事件 (a)", [this, d] { actions_.new_event(d); }, SmallButton()));
+    rows.push_back(Button(Tr("+ New event (a)"), [this, d] { actions_.new_event(d); }, SmallButton()));
 
     // ---- 固定日程 ----
     confirm_fixed_id_.clear();
-    rows.push_back(Renderer([] { return vbox({text(""), text("【固定日程】") | bold}); }));
+    rows.push_back(Renderer([] { return vbox({text(""), text(Tr("[Fixed schedules]")) | bold}); }));
     for (const FixedSchedule* f : s_.FixedOn(d)) rows.push_back(FixedRow(*f));
-    rows.push_back(Button("+ 新建固定日程 (f)", [this, d] { actions_.new_fixed(d); }, SmallButton()));
+    rows.push_back(Button(Tr("+ New fixed schedule (f)"), [this, d] { actions_.new_fixed(d); }, SmallButton()));
 
     // ---- 长期任务 ----
-    rows.push_back(Renderer([] { return vbox({text(""), text("【任务】") | bold}); }));
+    rows.push_back(Renderer([] { return vbox({text(""), text(Tr("[Tasks]")) | bold}); }));
     for (const TaskEntry& entry : s_.tasks()) {
       if (!ShowsOn(entry.state, d, today)) continue;
       rows.push_back(TaskRow(entry, d, today));
     }
-    rows.push_back(Button("+ 新建任务 (n)", [this] { actions_.new_task(); }, SmallButton()));
+    rows.push_back(Button(Tr("+ New task (n)"), [this] { actions_.new_task(); }, SmallButton()));
 
     // 重建后尽量保持原来的焦点行，落在标题行等不可聚焦行时就近调整
     const int n = static_cast<int>(rows.size());
@@ -133,19 +135,19 @@ class DayPanelBase : public ComponentBase {
   // 删除会删掉所有日期，所以要按两次：第一次变为 [确认删除]
   Component FixedRow(const FixedSchedule& f) {
     const FixedSchedule copy = f;
-    auto del = Button("删", [this, id = f.id, title = f.title] {
+    auto del = Button(Tr("Del"), [this, id = f.id, title = f.title] {
       if (confirm_fixed_id_ != id) {
         confirm_fixed_id_ = id;
-        s_.Info("再按一次确认删除固定日程「" + title + "」（所有日期）");
+        s_.Info(Tr("Press again to delete the fixed schedule \"{title}\" (all dates)", {{"title", title}}));
         return;
       }
       confirm_fixed_id_.clear();
-      Report(s_, s_.DeleteFixed(id), "已删除固定日程：" + title);
+      Report(s_, s_.DeleteFixed(id), Tr("Deleted fixed schedule: {title}", {{"title", title}}));
     }, SmallButton());
     return Renderer(del, [this, copy, del] {
       Element button = del->Render();
       if (confirm_fixed_id_ == copy.id) {
-        button = text("[确认删除]") | color(Color::Red) | bold;
+        button = text("[" + Tr("Confirm delete") + "]") | color(Color::Red) | bold;
         if (del->Focused()) button |= inverted;
       }
       auto top = hbox({text(copy.start + "-" + copy.end) | color(Color::Cyan) | size(WIDTH, EQUAL, 12),
@@ -163,18 +165,18 @@ class DayPanelBase : public ComponentBase {
     // [进行]：填写当天实际进行情况，可反复修改；未来日期锁定（不可聚焦）
     const bool locked = d > today;
     if (!locked)
-      controls.push_back(Button("进行", [this, id, d] { actions_.edit_progress(id, d); }, SmallButton()));
+      controls.push_back(Button(Tr("Log"), [this, id, d] { actions_.edit_progress(id, d); }, SmallButton()));
 
     // 状态按钮，顺序：进行、暂停/恢复、修改、中止、完成
     const bool ended = entry.state.ended.has_value();
     if (!ended) {
       if (entry.state.status == TaskStatus::kPaused)
-        controls.push_back(Button("恢复", [this, id] { ChangeStatus(id, "resume", "已恢复"); }, SmallButton()));
+        controls.push_back(Button(Tr("Resume"), [this, id] { ChangeStatus(id, "resume", Tr("Task resumed")); }, SmallButton()));
       else if (!entry.plan.overdue)
-        controls.push_back(Button("暂停", [this, id] { ChangeStatus(id, "pause", "已暂停"); }, SmallButton()));
-      controls.push_back(Button("修改", [this, id] { actions_.edit_task(id); }, SmallButton()));
-      controls.push_back(Button("中止", [this, id] { ChangeStatus(id, "abort", "已中止"); }, SmallButton()));
-      controls.push_back(Button("完成", [this, id] { ChangeStatus(id, "complete", "已完成"); }, SmallButton()));
+        controls.push_back(Button(Tr("Pause"), [this, id] { ChangeStatus(id, "pause", Tr("Task paused")); }, SmallButton()));
+      controls.push_back(Button(Tr("Modify"), [this, id] { actions_.edit_task(id); }, SmallButton()));
+      controls.push_back(Button(Tr("Abort"), [this, id] { ChangeStatus(id, "abort", Tr("Task aborted")); }, SmallButton()));
+      controls.push_back(Button(Tr("Done"), [this, id] { ChangeStatus(id, "complete", Tr("Task completed")); }, SmallButton()));
     }
 
     auto row = Container::Horizontal(controls);
@@ -191,18 +193,18 @@ class DayPanelBase : public ComponentBase {
         if (const auto it = e->plan.daily.find(d); it != e->plan.daily.end())
           plan_text = FormatMinutes(it->second);
         else if (!IsWorkday(e->state.spec, d, s_.holidays()))
-          plan_text = "休";
+          plan_text = Tr("Off");
       }
       const DayProgress done = e->state.ProgressOn(d);
-      auto amounts = hbox({text(" 计划 " + plan_text) | size(WIDTH, EQUAL, 12),
-                           text("实际 " + (locked ? std::string("-") : FormatMinutes(done.minutes)))});
+      auto amounts = hbox({text(Tr(" Plan {time}", {{"time", plan_text}})) | size(WIDTH, EQUAL, 14),
+                           text(Tr("Actual {time}", {{"time", locked ? std::string("-") : FormatMinutes(done.minutes)}}))});
 
       Elements buttons;
-      if (locked) buttons.push_back(hbox({text("[进行]") | dim | strikethrough, text("锁") | dim}));
+      if (locked) buttons.push_back(hbox({text("[" + Tr("Log") + "]") | dim | strikethrough, text(Tr("locked")) | dim}));
       for (const Component& c : controls) buttons.push_back(c->Render());
 
       Elements lines = {WrapText(e->task.name) | bold, id_status, amounts};
-      if (!done.note.empty()) lines.push_back(WrapText(" 内容：" + done.note) | dim);
+      if (!done.note.empty()) lines.push_back(WrapText(Tr(" Note: {note}", {{"note", done.note}})) | dim);
       lines.push_back(hbox(std::move(buttons)));
       lines.push_back(text(""));  // 任务之间空一行
       return vbox(std::move(lines));

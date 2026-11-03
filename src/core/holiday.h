@@ -18,6 +18,8 @@ struct Country {
 };
 const std::vector<Country>& SupportedCountries();
 std::string CountryName(std::string_view code);
+// 界面上以“节假日配置 N”称呼月历显示的节假日：N 为该国家在 SupportedCountries() 中的序号（从 1 开始）
+int HolidayConfigNumber(std::string_view code);
 
 struct HolidayDay {
   Date date;

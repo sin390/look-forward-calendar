@@ -3,26 +3,16 @@
 #include <algorithm>
 
 #include "core/holiday.h"
+#include "core/i18n.h"
 
 namespace cal {
-
-const std::vector<Language>& SupportedLanguages() {
-  static const std::vector<Language> kLanguages = {{"zh-CN", "中文"}};
-  return kLanguages;
-}
-
-std::string LanguageName(std::string_view code) {
-  for (const Language& l : SupportedLanguages())
-    if (l.code == code) return l.name;
-  return std::string(code);
-}
 
 Json ToJson(const Preference& p) { return {{"country", p.country}, {"language", p.language}}; }
 
 Preference PreferenceFromJson(const Json& j, std::vector<std::string>& warnings) {
   Preference p;
   if (!j.is_object()) {
-    warnings.push_back("preference.json：顶层必须是对象，已使用默认配置");
+    warnings.push_back(Tr("preference.json: top level must be an object, using defaults"));
     return p;
   }
   const std::string country = j.value("country", p.country);
@@ -30,14 +20,12 @@ Preference PreferenceFromJson(const Json& j, std::vector<std::string>& warnings)
   if (std::any_of(countries.begin(), countries.end(), [&](const Country& c) { return c.code == country; }))
     p.country = country;
   else
-    warnings.push_back("preference.json：不支持的国家 " + country + "，已改用 " + p.country);
+    warnings.push_back(Tr("preference.json: unsupported country {country}, using {default}",
+                          {{"country", country}, {"default", p.country}}));
 
-  const std::string language = j.value("language", p.language);
-  const auto& languages = SupportedLanguages();
-  if (std::any_of(languages.begin(), languages.end(), [&](const Language& l) { return l.code == language; }))
-    p.language = language;
-  else
-    warnings.push_back("preference.json：不支持的语言 " + language + "，已改用" + LanguageName(p.language));
+  // 语言文件是否存在在加载时检查；v1.3.0 写入的 "zh-CN" 对应 CN.json
+  p.language = j.value("language", p.language);
+  if (p.language == "zh-CN") p.language = "CN";
   return p;
 }
 

@@ -35,7 +35,8 @@ struct Reminder {
 // 不依赖 UI，便于测试。
 class AppState {
  public:
-  explicit AppState(fs::path data_root);
+  // language_dir：语言文件目录（exe 所在目录下的 language/）；为空时只用英文
+  explicit AppState(fs::path data_root, fs::path language_dir = {});
 
   // 从磁盘重新读取全部数据，更新“今天”，重算所有任务安排
   void Reload();
@@ -50,7 +51,9 @@ class AppState {
   const std::string& display_country() const { return pref_.country; }
   const std::string& language() const { return pref_.language; }
   void CycleDisplayCountry();
-  void CycleLanguage();
+  // 按 language/ 下的 *.json 文件名顺序切换到下一个语言；语言确实改变时返回 true（界面需要重建）
+  bool CycleLanguage();
+  std::vector<std::string> AvailableLanguages() const;  // 如 {"CN", "EN"}
 
   // 数据或选中日期每次变化都会递增，UI 据此决定是否重建动态控件
   uint64_t version() const { return version_; }
@@ -104,10 +107,13 @@ class AppState {
   void RecomputePlans();
   std::string NewId() const;  // 任务和固定日程共用的短 id，互不重复
   const std::map<Date, std::vector<size_t>>& FixedMonthOf(Date d);
-  void SavePreference();
+  bool SavePreference();  // 失败时在状态栏显示错误
+  // 加载 pref_.language 对应的语言文件，失败时回退为英文并写入 warnings（默认 warnings_）
+  void LoadLanguage(std::vector<std::string>* warnings = nullptr);
   void Touch() { ++version_; }
 
   Repository repo_;
+  fs::path language_dir_;
   HolidayCalendar holidays_;
   std::vector<TaskEntry> tasks_;
   std::map<std::pair<int, unsigned>, MonthDays> months_;

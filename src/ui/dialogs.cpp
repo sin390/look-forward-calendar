@@ -21,7 +21,7 @@ namespace {
 
 std::vector<std::string> CountryNames() {
   std::vector<std::string> names;
-  for (const Country& c : SupportedCountries()) names.push_back(c.name);
+  for (const Country& c : SupportedCountries()) names.push_back(CountryName(c.code));
   return names;
 }
 
@@ -41,10 +41,9 @@ std::string FormatLeadInput(int minutes) {
 
 // 星期复选框，按界面顺序（日 一 … 六）排列；weekdays 下标 0 = 周一
 Components WeekdayBoxes(std::array<bool, 7>& weekdays) {
-  static constexpr std::array<const char*, 7> kDays = {"一", "二", "三", "四", "五", "六", "日"};
   Components boxes;
   for (int w : kDisplayWeekOrder)
-    boxes.push_back(Checkbox(kDays[static_cast<size_t>(w - 1)], &weekdays[static_cast<size_t>(w - 1)]));
+    boxes.push_back(Checkbox(WeekdayShortName(w), &weekdays[static_cast<size_t>(w - 1)]));
   return boxes;
 }
 
@@ -105,33 +104,35 @@ Element Dialog::ErrorLine() const {
 // ---------------------------------------------------------------- EventDialog
 
 EventDialog::EventDialog(AppState& s) : s_(s) {
-  auto title = Input(&title_, "必填", Field(&title_));
+  auto title = Input(&title_, Tr("Required"), Field(&title_));
   auto start = Input(&start_, "HH:MM", Field(&start_));
   auto end = Input(&end_, "HH:MM", Field(&end_));
   auto note = Input(&note_, "", Field(&note_));
-  auto remind = Checkbox("提醒", &remind_);
-  auto lead = Input(&lead_, "如 30m / 1:00 / 1d", Field(&lead_));
-  auto ok = Button("确定", [this] { Submit(); }, SmallButton());
-  auto cancel = Button("取消", [this] { Close(); }, SmallButton());
+  auto remind = Checkbox(Tr("Remind"), &remind_);
+  auto lead = Input(&lead_, Tr("e.g. 30m / 1:00 / 1d"), Field(&lead_));
+  auto ok = Button(Tr("OK"), [this] { Submit(); }, SmallButton());
+  auto cancel = Button(Tr("Cancel"), [this] { Close(); }, SmallButton());
   auto controls = Container::Vertical(
       {title, start, end, note, remind, lead, Container::Horizontal({ok, cancel})});
 
-  Build("事件", controls, [=, this] {
+  Build(Tr("Event"), controls, [=, this] {
     return vbox({
-               text((index_ ? "编辑 " : "新建 ") + FormatDate(date_) + " 的事件") | dim,
+               text(index_ ? Tr("Edit event on {date}", {{"date", FormatDate(date_)}})
+                           : Tr("New event on {date}", {{"date", FormatDate(date_)}})) |
+                   dim,
                separatorLight(),
-               FormRow("标题", InputBox(title, 36)),
-               FormRow("开始时间", InputBox(start, 8)),
-               FormRow("结束时间", InputBox(end, 8)),
-               FormRow("备注", InputBox(note, 36)),
+               FormRow(Tr("Title"), InputBox(title, 36)),
+               FormRow(Tr("Start time"), InputBox(start, 8)),
+               FormRow(Tr("End time"), InputBox(end, 8)),
+               FormRow(Tr("Note"), InputBox(note, 36)),
                FormRow("", remind->Render()),
-               FormRow("提前", hbox({InputBox(lead, 20), text(" 前提醒")})) | (remind_ ? nothing : dim),
-               text("   全天事件以当天 0:00 为开始时间") | dim,
+               FormRow(Tr("Lead"), hbox({InputBox(lead, 20), text(Tr(" before start"))})) | (remind_ ? nothing : dim),
+               text(Tr("   All-day events start at 0:00")) | dim,
                ErrorLine(),
                separatorLight(),
                Buttons(ok, cancel),
            }) |
-           size(WIDTH, EQUAL, 52);
+           size(WIDTH, EQUAL, 60);
   }, {title, start, end, note, remind, lead, ok, cancel});
 }
 
@@ -162,7 +163,7 @@ void EventDialog::Submit() {
   if (remind_) {
     e.remind = ParseLeadTime(lead_);
     if (!e.remind) {
-      error_ = "提前量格式应为 30m / 1:00 / 2（小时）/ 1d";
+      error_ = Tr("Lead time must be like 30m / 1:00 / 2 (hours) / 1d");
       return;
     }
   }
@@ -171,42 +172,43 @@ void EventDialog::Submit() {
     error_ = r.error();
     return;
   }
-  s_.Info("已保存事件");
+  s_.Info(Tr("Event saved"));
   Close();
 }
 
 // ---------------------------------------------------------------- TaskDialog
 
 TaskDialog::TaskDialog(AppState& s) : s_(s), country_names_(CountryNames()) {
-  auto name = Input(&name_, "必填", Field(&name_));
-  auto total = Input(&total_, "如 40 或 12:30", Field(&total_));
+  auto name = Input(&name_, Tr("Required"), Field(&name_));
+  auto total = Input(&total_, Tr("e.g. 40 or 12:30"), Field(&total_));
   auto due = Input(&due_, "YYYY-MM-DD", Field(&due_));
   Components day_boxes = WeekdayBoxes(weekdays_);
   auto days = Container::Horizontal(day_boxes);
-  auto skip = Checkbox("跳过节假日", &skip_holiday_);
+  auto skip = Checkbox(Tr("Skip holidays"), &skip_holiday_);
   auto country = Toggle(&country_names_, &country_index_);
-  auto ok = Button("确定", [this] { Submit(); }, SmallButton());
-  auto cancel = Button("取消", [this] { Close(); }, SmallButton());
+  auto ok = Button(Tr("OK"), [this] { Submit(); }, SmallButton());
+  auto cancel = Button(Tr("Cancel"), [this] { Close(); }, SmallButton());
   auto controls =
       Container::Vertical({name, total, due, days, skip, country, Container::Horizontal({ok, cancel})});
 
-  Build("长期任务", controls, [=, this] {
+  Build(Tr("Long-term task"), controls, [=, this] {
     Elements day_elems;
-    for (const Component& c : day_boxes) day_elems.push_back(c->Render() | size(WIDTH, EQUAL, 6));
+    for (const Component& c : day_boxes) day_elems.push_back(c->Render() | size(WIDTH, EQUAL, 7));
     return vbox({
-               text(task_id_.empty() ? "新建任务（创建当天计入安排）" : "修改任务 " + IdTag(task_id_)) | dim,
+               text(task_id_.empty() ? Tr("New task (the creation day is included in the plan)")
+                                    : Tr("Modify task {id}", {{"id", IdTag(task_id_)}})) | dim,
                separatorLight(),
-               FormRow("任务名", InputBox(name, 30)),
-               FormRow("预定时长", hbox({InputBox(total, 16), text(" 小时") | dim})),
-               FormRow("完成日期", InputBox(due, 12)),
-               FormRow("每周工作", hbox(std::move(day_elems))),
+               FormRow(Tr("Task name"), InputBox(name, 30)),
+               FormRow(Tr("Planned hours"), hbox({InputBox(total, 16), text(Tr(" hours")) | dim})),
+               FormRow(Tr("Due date"), InputBox(due, 12)),
+               FormRow(Tr("Workdays"), hbox(std::move(day_elems))),
                FormRow("", skip->Render()),
-               FormRow("节假日国家", country->Render()),
+               FormRow(Tr("Holiday country"), country->Render()),
                ErrorLine(),
                separatorLight(),
                Buttons(ok, cancel),
            }) |
-           size(WIDTH, EQUAL, 56);
+           size(WIDTH, EQUAL, 64);
   }, {name, total, due, days, skip, country, ok, cancel});
 }
 
@@ -240,13 +242,13 @@ void TaskDialog::Submit() {
   spec.name = std::string(Trim(name_));
   const auto total = ParseDuration(total_);
   if (!total) {
-    error_ = "预定时长格式错误（小时数，或 H:MM）";
+    error_ = Tr("Invalid planned hours (hours, or H:MM)");
     return;
   }
   spec.total_minutes = *total;
   const auto due = ParseDate(Trim(due_));
   if (!due) {
-    error_ = "完成日期格式应为 YYYY-MM-DD";
+    error_ = Tr("Due date must be YYYY-MM-DD");
     return;
   }
   spec.due = *due;
@@ -259,7 +261,8 @@ void TaskDialog::Submit() {
     error_ = r.error();
     return;
   }
-  s_.Info(task_id_.empty() ? "已创建任务：" + spec.name : "已修改任务：" + spec.name);
+  s_.Info(task_id_.empty() ? Tr("Task created: {name}", {{"name", spec.name}})
+                           : Tr("Task modified: {name}", {{"name", spec.name}}));
   Close();
 }
 
@@ -271,45 +274,45 @@ constexpr std::array<Repeat, 4> kRepeats = {Repeat::kDaily, Repeat::kWeekly, Rep
 
 FixedDialog::FixedDialog(AppState& s) : s_(s) {
   for (Repeat r : kRepeats) repeat_names_.push_back(RepeatName(r));
-  auto title = Input(&title_, "必填", Field(&title_));
+  auto title = Input(&title_, Tr("Required"), Field(&title_));
   auto start = Input(&start_, "HH:MM", Field(&start_));
   auto end = Input(&end_, "HH:MM", Field(&end_));
   auto repeat = Toggle(&repeat_names_, &repeat_index_);
   Components day_boxes = WeekdayBoxes(weekdays_);
   auto days = Container::Horizontal(day_boxes);
   auto from = Input(&from_, "YYYY-MM-DD", Field(&from_));
-  auto until = Input(&until_, "可空：一直重复", Field(&until_));
+  auto until = Input(&until_, Tr("Optional: repeat forever"), Field(&until_));
   auto note = Input(&note_, "", Field(&note_));
-  auto ok = Button("确定", [this] { Submit(); }, SmallButton());
-  auto cancel = Button("取消", [this] { Close(); }, SmallButton());
+  auto ok = Button(Tr("OK"), [this] { Submit(); }, SmallButton());
+  auto cancel = Button(Tr("Cancel"), [this] { Close(); }, SmallButton());
   auto controls = Container::Vertical(
       {title, start, end, repeat, days, from, until, note, Container::Horizontal({ok, cancel})});
 
-  Build("固定日程", controls, [=, this] {
+  Build(Tr("Fixed schedule"), controls, [=, this] {
     const Repeat r = kRepeats[static_cast<size_t>(repeat_index_)];
     const bool uses_days = r == Repeat::kWeekly || r == Repeat::kBiweekly;
     Elements day_elems;
-    for (const Component& c : day_boxes) day_elems.push_back(c->Render() | size(WIDTH, EQUAL, 6));
-    std::string hint = "   每两周：从开始日期所在的那一周算起，隔一周一次";
-    if (r == Repeat::kMonthly) hint = "   每月：在开始日期的那一天重复，没有这一天的月份跳过";
-    if (r == Repeat::kDaily || r == Repeat::kWeekly) hint = "   保存在 data/fixed/，删除时所有日期一起删除";
+    for (const Component& c : day_boxes) day_elems.push_back(c->Render() | size(WIDTH, EQUAL, 7));
+    std::string hint = Tr("   Biweekly: every other week, counted from the week of the start date");
+    if (r == Repeat::kMonthly) hint = Tr("   Monthly: on the start date's day; months without that day are skipped");
+    if (r == Repeat::kDaily || r == Repeat::kWeekly) hint = Tr("   Saved in data/fixed/; deleting removes all dates");
     return vbox({
-               text("新建固定日程") | dim,
+               text(Tr("New fixed schedule")) | dim,
                separatorLight(),
-               FormRow("工作内容", InputBox(title, 36)),
-               FormRow("开始时间", InputBox(start, 8)),
-               FormRow("结束时间", InputBox(end, 8)),
-               FormRow("重复", repeat->Render()),
-               FormRow("星期", hbox(std::move(day_elems))) | (uses_days ? nothing : dim),
-               FormRow("开始日期", InputBox(from, 12)),
-               FormRow("结束日期", InputBox(until, 18)),
-               FormRow("备注", InputBox(note, 36)),
+               FormRow(Tr("Work content"), InputBox(title, 36)),
+               FormRow(Tr("Start time"), InputBox(start, 8)),
+               FormRow(Tr("End time"), InputBox(end, 8)),
+               FormRow(Tr("Repeat"), repeat->Render()),
+               FormRow(Tr("Days"), hbox(std::move(day_elems))) | (uses_days ? nothing : dim),
+               FormRow(Tr("Start date"), InputBox(from, 12)),
+               FormRow(Tr("End date"), InputBox(until, 28)),
+               FormRow(Tr("Note"), InputBox(note, 36)),
                text(hint) | dim,
                ErrorLine(),
                separatorLight(),
                Buttons(ok, cancel),
            }) |
-           size(WIDTH, EQUAL, 60);
+           size(WIDTH, EQUAL, 72);
   }, {title, start, end, repeat, days, from, until, note, ok, cancel});
 }
 
@@ -332,14 +335,14 @@ void FixedDialog::Submit() {
   f.weekdays = weekdays_;
   const auto from = ParseDate(Trim(from_));
   if (!from) {
-    error_ = "开始日期格式应为 YYYY-MM-DD";
+    error_ = Tr("Start date must be YYYY-MM-DD");
     return;
   }
   f.from = *from;
   if (const std::string_view u = Trim(until_); !u.empty()) {
     f.until = ParseDate(u);
     if (!f.until) {
-      error_ = "结束日期格式应为 YYYY-MM-DD，或留空";
+      error_ = Tr("End date must be YYYY-MM-DD, or left empty");
       return;
     }
   }
@@ -347,20 +350,20 @@ void FixedDialog::Submit() {
     error_ = r.error();
     return;
   }
-  s_.Info("已添加固定日程：" + f.title + "（" + RepeatText(f) + "）");
+  s_.Info(Tr("Fixed schedule added: {title} ({repeat})", {{"title", f.title}, {"repeat", RepeatText(f)}}));
   Close();
 }
 
 // ---------------------------------------------------------------- ProgressDialog
 
 ProgressDialog::ProgressDialog(AppState& s) : s_(s) {
-  auto minutes = Input(&minutes_, "如 1:30 / 1.5 / 90m", Field(&minutes_, [this] { Submit(); }));
-  auto note = Input(&note_, "今天做了什么", Field(&note_, [this] { Submit(); }));
-  auto ok = Button("确定", [this] { Submit(); }, SmallButton());
-  auto cancel = Button("取消", [this] { Close(); }, SmallButton());
+  auto minutes = Input(&minutes_, Tr("e.g. 1:30 / 1.5 / 90m"), Field(&minutes_, [this] { Submit(); }));
+  auto note = Input(&note_, Tr("What did you do today?"), Field(&note_, [this] { Submit(); }));
+  auto ok = Button(Tr("OK"), [this] { Submit(); }, SmallButton());
+  auto cancel = Button(Tr("Cancel"), [this] { Close(); }, SmallButton());
   auto controls = Container::Vertical({minutes, note, Container::Horizontal({ok, cancel})});
 
-  Build("进行", controls, [=, this] {
+  Build(Tr("Log progress"), controls, [=, this] {
     const TaskEntry* e = s_.FindTask(task_id_);
     std::string plan = "-";
     if (e) {
@@ -369,16 +372,16 @@ ProgressDialog::ProgressDialog(AppState& s) : s_(s) {
     }
     return vbox({
                text((e ? e->task.name + " " + IdTag(task_id_) : std::string()) + "  " + FormatDate(date_)) | bold,
-               text("当天计划 " + plan) | dim,
+               text(Tr("Planned for the day: {plan}", {{"plan", plan}})) | dim,
                separatorLight(),
-               FormRow("实际时长", InputBox(minutes, 20)),
-               FormRow("进行内容", InputBox(note, 36)),
-               text("   清空时长和内容即删除当天记录") | dim,
+               FormRow(Tr("Actual time"), InputBox(minutes, 20)),
+               FormRow(Tr("Progress note"), InputBox(note, 36)),
+               text(Tr("   Clear both fields to delete the day's record")) | dim,
                ErrorLine(),
                separatorLight(),
                Buttons(ok, cancel),
            }) |
-           size(WIDTH, EQUAL, 52);
+           size(WIDTH, EQUAL, 60);
   }, {minutes, note, ok, cancel});
 }
 
@@ -386,7 +389,7 @@ void ProgressDialog::Open(const std::string& task_id, Date d) {
   const TaskEntry* e = s_.FindTask(task_id);
   if (!e) return;
   if (d > s_.today()) {
-    s_.Error("未来的日期已锁定，不能填写");
+    s_.Error(Tr("Future dates are locked"));
     return;
   }
   task_id_ = task_id;
@@ -401,7 +404,7 @@ void ProgressDialog::Submit() {
   const std::string_view m = Trim(minutes_);
   const auto minutes = m.empty() ? std::optional<int>(0) : ParseDuration(m);
   if (!minutes) {
-    error_ = "时长格式应为 1:30 / 1.5 / 90m";
+    error_ = Tr("Time must be like 1:30 / 1.5 / 90m");
     return;
   }
   const Result r = s_.SetProgress(task_id_, date_, {*minutes, std::string(Trim(note_))});
@@ -409,26 +412,26 @@ void ProgressDialog::Submit() {
     error_ = r.error();
     return;
   }
-  s_.Info("已保存 " + ShortDate(date_) + " 的进行情况");
+  s_.Info(Tr("Progress saved for {date}", {{"date", ShortDate(date_)}}));
   Close();
 }
 
 // ---------------------------------------------------------------- AboutDialog
 
 AboutDialog::AboutDialog() {
-  auto close = Button("关闭", [this] { Close(); }, SmallButton());
-  Build("关于", close, [close] {
+  auto close = Button(Tr("Close"), [this] { Close(); }, SmallButton());
+  Build(Tr("About"), close, [close] {
     return vbox({
                LogoBanner() | hcenter,
                separatorLight(),
-               WrapText(kCredits),
+               WrapText(Tr("This program was written by Claude (Anthropic) based on requirements and design discussions with ZXHAN.")),
                text(""),
-               text(std::string("编写模型：") + kModel),
-               text("基于 FTXUI 7 与 nlohmann/json，C++23") | dim,
+               text(Tr("Model: {model}", {{"model", kModel}})),
+               text(Tr("Built with FTXUI 7 and nlohmann/json, C++23")) | dim,
                separatorLight(),
                hbox({filler(), close->Render()}),
            }) |
-           size(WIDTH, EQUAL, 50);
+           size(WIDTH, EQUAL, 56);
   }, {close});
 }
 
@@ -437,13 +440,13 @@ AboutDialog::AboutDialog() {
 HolidayDialog::HolidayDialog(AppState& s) : s_(s), country_names_(CountryNames()) {
   auto country = Toggle(&country_names_, &country_index_);
   auto year = Input(&year_, "YYYY", Field(&year_));
-  auto gen = Button("生成并复制提示词", [this] { MakePrompt(); }, SmallButton());
-  auto path = Input(&path_, "AI 返回的 JSON 保存后的文件路径", Field(&path_, [this] { Import(); }));
-  auto import_btn = Button("导入", [this] { Import(); }, SmallButton());
-  auto close = Button("关闭", [this] { Close(); }, SmallButton());
+  auto gen = Button(Tr("Generate & copy prompt"), [this] { MakePrompt(); }, SmallButton());
+  auto path = Input(&path_, Tr("Path of the file holding the AI's JSON"), Field(&path_, [this] { Import(); }));
+  auto import_btn = Button(Tr("Import"), [this] { Import(); }, SmallButton());
+  auto close = Button(Tr("Close"), [this] { Close(); }, SmallButton());
   auto controls = Container::Vertical({country, year, gen, path, Container::Horizontal({import_btn, close})});
 
-  Build("导入节假日", controls, [=, this] {
+  Build(Tr("Import holidays"), controls, [=, this] {
     Elements prompt_lines;
     std::istringstream ss(prompt_);
     for (std::string line; std::getline(ss, line);) prompt_lines.push_back(text(line));
@@ -453,21 +456,21 @@ HolidayDialog::HolidayDialog(AppState& s) : s_(s), country_names_(CountryNames()
       loaded += (loaded.empty() ? "" : "  ") + code + " " + std::to_string(y);
 
     Elements body = {
-        text("已导入：" + (loaded.empty() ? std::string("无") : loaded)) | dim,
+        text(Tr("Imported: {list}", {{"list", loaded.empty() ? Tr("none") : loaded}})) | dim,
         separatorLight(),
-        FormRow("国家", country->Render()),
-        FormRow("年份", InputBox(year, 8)),
-        FormRow("① 提示词", gen->Render()),
+        FormRow(Tr("Country"), country->Render()),
+        FormRow(Tr("Year"), InputBox(year, 8)),
+        FormRow(Tr("① Prompt"), gen->Render()),
     };
     if (!prompt_lines.empty())
       body.push_back(vbox(std::move(prompt_lines)) | dim | yframe | size(HEIGHT, LESS_THAN, 12) | border);
-    body.push_back(FormRow("② 文件路径", InputBox(path, 48)));
-    body.push_back(text("   同一国家同一年份的旧数据会被整体覆盖") | dim);
+    body.push_back(FormRow(Tr("② File path"), InputBox(path, 48)));
+    body.push_back(text(Tr("   Existing data for the same country and year will be replaced")) | dim);
     if (!info_.empty()) body.push_back(WrapText(info_) | color(Color::Green));
     body.push_back(ErrorLine());
     body.push_back(separatorLight());
     body.push_back(Buttons(import_btn, close));
-    return vbox(std::move(body)) | size(WIDTH, EQUAL, 66);
+    return vbox(std::move(body)) | size(WIDTH, EQUAL, 72);
   }, {country, year, gen, path, import_btn, close});
 }
 
@@ -489,7 +492,7 @@ std::optional<int> HolidayDialog::ParsedYear() {
   int value = 0;
   auto [p, ec] = std::from_chars(y.data(), y.data() + y.size(), value);
   if (ec != std::errc{} || p != y.data() + y.size() || value < 1900 || value > 2100) {
-    error_ = "年份应为 1900–2100 的整数";
+    error_ = Tr("Year must be an integer from 1900 to 2100");
     info_.clear();
     return std::nullopt;
   }
@@ -501,8 +504,8 @@ void HolidayDialog::MakePrompt() {
   if (!year) return;
   prompt_ = HolidayPrompt(Country(), *year);
   error_.clear();
-  info_ = CopyToClipboard(prompt_) ? "提示词已复制到剪贴板，粘贴给 AI 即可"
-                                   : "复制到剪贴板失败，请手动复制下方提示词";
+  info_ = CopyToClipboard(prompt_) ? Tr("Prompt copied to the clipboard; paste it to an AI")
+                                   : Tr("Copy to clipboard failed; please copy the prompt below manually");
 }
 
 void HolidayDialog::Import() {
@@ -512,7 +515,7 @@ void HolidayDialog::Import() {
   std::string_view p = Trim(path_);
   if (p.size() >= 2 && p.front() == '"' && p.back() == '"') p = p.substr(1, p.size() - 2);
   if (p.empty()) {
-    error_ = "请输入文件路径";
+    error_ = Tr("Please enter a file path");
     info_.clear();
     return;
   }
@@ -523,7 +526,7 @@ void HolidayDialog::Import() {
     return;
   }
   error_.clear();
-  info_ = "已导入 " + CountryName(Country()) + " " + std::to_string(*year) + " 年节假日";
+  info_ = Tr("Imported {country} holidays for {year}", {{"country", CountryName(Country())}, {"year", std::to_string(*year)}});
   s_.Info(info_);
 }
 

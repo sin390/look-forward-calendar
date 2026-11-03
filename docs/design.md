@@ -1,58 +1,62 @@
-# 日历程序设计文档
+# Calendar Design Document
 
-LookForwardCalendar（LFCalendar），基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 长期任务）+ 农历 + 中日节假日。
+English | [中文](design_CN.md)
 
-## 1. 技术栈
+LookForwardCalendar (LFCalendar), a terminal calendar built with FTXUI: month view + schedule management (events / fixed schedules / long-term tasks) + Chinese lunar calendar + Chinese and Japanese holidays.
 
-| 项目 | 选择 |
+## 1. Tech stack
+
+| Item | Choice |
 |---|---|
-| 语言 | C++20（日期计算用 `<chrono>`） |
+| Language | C++23 (date arithmetic with `<chrono>`) |
 | UI | FTXUI v7.0.3 |
-| JSON | nlohmann/json（header-only，FetchContent 引入） |
-| 构建 | CMake + Ninja，GCC 15.1（MinGW），静态链接 |
-| 平台 | 仅 Windows，不考虑跨平台 |
+| JSON | nlohmann/json (header-only, via FetchContent) |
+| Build | CMake + Ninja, GCC 15.1 (MinGW), statically linked |
+| Platform | Windows only; no cross-platform support |
 
-## 2. 数据目录
+## 2. Data directory
 
-根目录为 **exe 所在目录**下的 `data/`（不依赖启动时的工作目录）。
+The root is `data/` in **the exe's directory** (independent of the working directory at startup).
 
 ```
 data/
-  general/<年>/<月>.json        当月每天的属性及瞬间型事件，例：general/2026/11.json
-  task/<创建日期>_<短id>.json   每个长期任务一个文件（操作日志），例：task/20261102_a3f9.json
-  fixed/<创建日期>_<短id>.json  每个固定日程一个文件，例：fixed/20261103_b71c.json
-  preference.json               配置：{ "country": "CN", "language": "zh-CN" }
-  holidays/<国家>_<年>.json     导入的节假日，例：holidays/CN_2027.json
+  general/<year>/<month>.json    per-day properties and events of the month, e.g. general/2026/11.json
+  task/<created>_<id>.json       one file per long-term task (operation log), e.g. task/20261102_a3f9.json
+  fixed/<created>_<id>.json      one file per fixed schedule, e.g. fixed/20261103_b71c.json
+  preference.json                settings: { "country": "CN", "language": "EN" }
+  holidays/<country>_<year>.json imported holidays, e.g. holidays/CN_2027.json
 ```
 
-## 3. 数据模型
+Language files are not user data. They live in `language/` in the exe's directory (`EN.json`, `CN.json`, ...) and are copied there from the source `language/` by CMake after each build.
 
-### 3.1 Day（每天一个对象）
+## 3. Data model
 
-`general/2026/11.json`：以日期为键，没有内容的日期不写入。
+### 3.1 Day (one object per day)
+
+`general/2026/11.json`: keyed by date; days without content are not written.
 
 ```json
 {
   "2026-11-02": {
     "events": [
-      { "title": "组会", "start": "14:00", "end": "15:30", "note": "" }
+      { "title": "Group meeting", "start": "14:00", "end": "15:30", "note": "" }
     ]
   }
 }
 ```
 
-- 瞬间型事件直接保存在 Day 上。
-- 事件的增删改都是直接改写当月文件。
+- Events are stored directly on the Day.
+- Adding, editing or deleting an event rewrites the month file.
 
-### 3.2 FixedSchedule（固定日程，一个固定日程一个文件）
+### 3.2 FixedSchedule (one file per fixed schedule)
 
 ```json
 {
   "id": "b71c",
-  "title": "组会",
+  "title": "Group meeting",
   "start": "09:00",
   "end": "10:00",
-  "note": "会议室 A",
+  "note": "Room A",
   "repeat": "weekly",
   "weekdays": [2, 4],
   "from": "2026-11-03",
@@ -60,19 +64,19 @@ data/
 }
 ```
 
-- `repeat`：`daily` / `weekly`（默认）/ `biweekly` / `monthly`。`weekdays`（1=周一…7=周日）只用于 weekly、biweekly。
-- biweekly 以 `from` 所在的那一周为第一周；monthly 在 `from` 的日期重复，没有这一天的月份跳过。`until` 为空表示一直重复（含 `until` 当天）。
-- 启动和刷新时读入全部定义；某个月第一次显示时才展开为该月每天的列表并缓存（`AppState::FixedOn`），增删后清空缓存。
-- 只能新建和删除；删除即删除文件，所有日期一起消失。
+- `repeat`: `daily` / `weekly` (default) / `biweekly` / `monthly`. `weekdays` (1 = Monday … 7 = Sunday) is used only by weekly and biweekly.
+- biweekly counts the week containing `from` as the first week; monthly repeats on the day of the month of `from`, skipping months without that day. An empty `until` means it repeats forever (`until` itself is included).
+- All definitions are read at startup and on refresh; a month is expanded into per-day lists the first time it is shown and then cached (`AppState::FixedOn`); the cache is cleared when a schedule is added or deleted.
+- Schedules can only be created and deleted; deleting removes the file, and with it every date.
 
-### 3.3 Task（长期任务，一个任务一个文件）
+### 3.3 Task (long-term task, one file per task)
 
-文件里保存的是**操作日志**，任务的当前状态和每天的工作量都由重放日志计算得到。
+The file stores an **operation log**; the task's current state and its daily workload are computed by replaying the log.
 
 ```json
 {
   "id": "a3f9",
-  "name": "毕业论文",
+  "name": "Thesis",
   "log": [
     { "at": "2026-11-02T22:10", "op": "create",
       "hours_total": "40:00", "due": "2026-12-20",
@@ -86,59 +90,59 @@ data/
 }
 ```
 
-| op | 含义 | 字段 |
+| op | Meaning | Fields |
 |---|---|---|
-| `create` | 创建 | 预定总时长、截止日期、每周工作日（1=周一…7=周日）、是否跳过节假日、节假日国家 |
-| `progress` | 录入某天实际工作量 | `date`、`minutes`（同一天再次录入时覆盖，**待确认，见 §9**） |
-| `modify` | 修改属性 | `fields`：总时长 / 截止日期 / 工作日 / 名称等 |
-| `pause` / `resume` | 暂停 / 恢复 | 暂停后截止日期不变 |
-| `complete` | 提前（或按期）完成 | |
-| `abort` | 中止 | |
+| `create` | create | total planned time, due date, workdays (1 = Monday … 7 = Sunday), whether to skip holidays, holiday country |
+| `progress` | actual work on a day | `date`, `minutes`, `note` (a later entry for the same day overwrites the earlier one) |
+| `modify` | change properties | `fields`: total time / due date / workdays / name, etc. |
+| `pause` / `resume` | pause / resume | the due date does not change while paused |
+| `complete` | finished (early or on time) | |
+| `abort` | aborted | |
 
-- 短 id：创建时随机生成 4 位十六进制，作为属性保存；如果和已有任务重复就重新生成。
-- 文件名：`<创建日期>_<短id>.json`，任务名只保存在文件内容里。
+- Short id: 4 random hex digits generated at creation and stored as a property; regenerated if it collides with an existing task or fixed schedule.
+- File name: `<created>_<id>.json`; the task name is stored only inside the file.
 
-### 3.4 任务状态机
+### 3.4 Task state machine
 
 ```
-           pause            complete / abort
- 进行中 ─────────▶ 暂停 ─────────────────▶ 已结束
+           pause             complete / abort
+ Active ─────────▶ Paused ─────────────────▶ Ended
    ▲ ◀─────────── │
    │    resume    │
-   └─ 超期未完成 ─┘（自动进入暂停，标红）
+   └─ overdue, unfinished ─┘ (automatically paused, shown in red)
 ```
 
-### 3.5 每日工作量计算
+### 3.5 Daily workload
 
-对某个任务和日期 D（今天及以后）：
+For a task and a date D (today or later):
 
 ```
-R = 总时长 − 实际录入工时之和（今天之前的）
-N = 今天 到 截止日期 之间的工作日数（包括今天）
-工作日 = 星期属于 weekdays，且（skip_holiday 为假，或该日不是 country 国的放假日）
-每天分配量 = ceil(R / N)，向上取整到 10 分钟
+R = total time − sum of actual work logged (before today)
+N = number of workdays from today to the due date (including today)
+workday = weekday is in weekdays, and (skip_holiday is false, or the day is not a day off in country)
+daily amount = ceil(R / N), rounded up to 10 minutes
 ```
 
-- 创建当天算一天。
-- 按顺序逐日分配：每天取 ceil(剩余 / 剩余工作日数)，向上取整到 10 分钟，再从剩余中扣除。所以越往后的日子分到的量可能略少，总和正好等于剩余量。
-- 今天的计划只用**今天之前**录入的工作量计算，今天录入的工作量不改变今天的目标。
-- 没有录入的日子按 0 分钟计，后续几天的量会自动增加。
-- 暂停期间不分配工作量，截止日期不变，恢复后每天的量相应增加。
-- 已完成、已中止的任务不再分配。
-- 超期（或已经没有可用工作日）但 R > 0：任务标红，作为**计算出的暂停状态**（不写日志）；延长截止日期后自动恢复。
-- 不考虑补班日（节假日数据里的 `off: false` 只用于显示）。
-- **实际工作量录入**：侧边栏的“实际”输入框，回车保存，结果为覆盖写入，可以随时修改；今天及以前的日期都可以录入（含补录）。
-- **过去的日期**：月历格子显示当天实际录入的工时。
-- **刷新（r）**：重新读取磁盘上的全部文件，更新“今天”，重算所有安排。demo 中每次修改后也会自动重算。
+- The creation day counts.
+- Work is assigned day by day: each day takes ceil(remaining / remaining workdays), rounded up to 10 minutes, and is then subtracted from the remainder. Later days may get slightly less; the total equals the remainder exactly.
+- Today's plan uses only work logged **before today**; work logged today does not change today's target.
+- A day with nothing logged counts as 0 minutes, and the following days get more.
+- No work is assigned while paused; the due date stays, so each day gets more after resuming.
+- Completed and aborted tasks get no more work.
+- Overdue (or no usable workday left) with R > 0: the task is shown in red as a **computed paused state** (nothing is written to the log); it resumes automatically when the due date is extended.
+- Make-up workdays are ignored (`off: false` in holiday data is only displayed).
+- **Logging actual work**: the [Log] button in the sidebar; the value overwrites and can be changed any time; today and earlier dates can be logged (including catching up).
+- **Past dates**: the calendar cell shows the actual work logged that day.
+- **Refresh (r)**: re-reads every file on disk, updates "today" and recomputes all plans. Plans are also recomputed after every change.
 
-## 4. 农历
+## 4. Lunar calendar
 
-- 内置 1900–2100 年的农历压缩数据表（每年一个整数，编码闰月和大小月），不联网。
-- 能算出：农历日期、干支、生肖、农历节日（春节、元宵、端午、七夕、中秋、重阳、除夕）、二十四节气（含清明、冬至）。
+- A built-in compressed lunar table for 1900–2100 (one integer per year encoding the leap month and long/short months); no network needed.
+- Computes: lunar date, sexagenary cycle, zodiac animal, lunar festivals (Spring Festival, Lantern Festival, Dragon Boat, Qixi, Mid-Autumn, Double Ninth, New Year's Eve) and the 24 solar terms (including Qingming and the winter solstice).
 
-## 5. 节假日
+## 5. Holidays
 
-### 5.1 统一格式 `holidays/<国家>_<年>.json`
+### 5.1 Common format `holidays/<country>_<year>.json`
 
 ```json
 {
@@ -151,133 +155,149 @@ N = 今天 到 截止日期 之间的工作日数（包括今天）
 }
 ```
 
-- `off: true` 表示放假日；`off: false` 表示补班日（只有中国有）。
-- 只列出特殊日期，没列出的日期按普通工作日或周末处理。
+- `off: true` is a day off; `off: false` is a make-up workday (China only).
+- Only special dates are listed; other dates are ordinary workdays or weekends.
 
-### 5.2 导入流程
+### 5.2 Import flow
 
-1. 在程序里按快捷键，选择国家和年份，弹窗显示提示词，并自动复制到剪贴板。
-2. 用户把提示词发给任意 AI，把返回的 JSON 保存成文件。
-3. 在程序里输入文件路径，程序校验格式（字段、日期是否合法、年份和国家是否一致）。
-4. 校验通过后写入 `holidays/<国家>_<年>.json`，同一国家同一年的旧数据整体覆盖。
+1. In the program, press the key, choose a country and a year; a dialog shows the prompt and copies it to the clipboard.
+2. The user sends the prompt to any AI and saves the returned JSON to a file.
+3. The user enters the file path; the program validates the format (fields, valid dates, matching year and country).
+4. If valid, it is written to `holidays/<country>_<year>.json`, replacing existing data for the same country and year.
 
-### 5.3 提示词模板（程序内置，`{COUNTRY}` / `{COUNTRY_NAME}` / `{YEAR}` 会被替换）
+### 5.3 Prompt template (built in; `{COUNTRY}` / `{COUNTRY_NAME}` / `{YEAR}` are replaced)
+
+The prompt is itself a piece of UI text: this English version is the key in the source code; `CN.json` holds the Chinese translation used when the UI language is CN.
 
 ```
-请列出{COUNTRY_NAME}{YEAR}年全年的法定节假日安排，严格按照下面的 JSON 格式，
-把完整的 JSON 放在一个 ```json 代码块中输出，代码块外不要输出其他文字。
-如果你能够生成文件，请同时生成一个名为 {COUNTRY}_{YEAR}.json 的文件供下载，内容与代码块中的 JSON 完全相同。
+List all statutory public holidays of {COUNTRY_NAME} for the year {YEAR}, strictly in the JSON format below.
+Put the complete JSON in a single ```json code block, and output nothing outside the code block.
+If you can create files, also create a downloadable file named {COUNTRY}_{YEAR}.json with exactly the same JSON as the code block.
 
 {
   "country": "{COUNTRY}",
   "year": {YEAR},
   "days": [
-    { "date": "YYYY-MM-DD", "name": "节日名称", "off": true }
+    { "date": "YYYY-MM-DD", "name": "Holiday name", "off": true }
   ]
 }
 
-规则：
-1. 每个日期单独一条，连续放假的每一天都要列出。
-2. 放假日（含周末因节日顺延的补休/振替休日）"off" 为 true。
-3. 因调休需要上班的周末（补班日）也要列出，"off" 为 false，name 写“XX调休补班”。
-4. name 使用该国语言的通用名称。
-5. 只列出 {YEAR} 年内的日期，按日期升序排列。
-6. 依据该国政府官方公布的安排；如果官方尚未公布，请在 name 后加“(预测)”。
+Rules:
+1. One entry per date; list every day of a multi-day holiday.
+2. Days off (including substitute holidays for holidays that fall on a weekend) have "off": true.
+3. Also list weekend days that become working days because of holiday adjustments, with "off": false and name "XX make-up workday".
+4. Use the common name of each holiday in that country's language.
+5. Only list dates within {YEAR}, sorted by date in ascending order.
+6. Follow the schedule officially published by the government; if it has not been published yet, append "(forecast)" to the name.
 ```
 
-## 6. 界面（月视图）
+## 6. Screen (month view)
 
 ```
-┌ 2026 年 11 月 ──────────────────────────────────┬ 11月2日 周一 ─────────┐
-│  日     一     二     三     四     五     六   │ 农历 十月初二          │
+┌ November 2026 ──────────────────────────────────┬ 11/2 Mon ──────────────┐
+│  Su     Mo     Tu     We     Th     Fr     Sa   │ Lunar: 十月初二        │
 │ ┌────┐                                          │                        │
-│ │ 2  │  公历日 / 农历或节日、节气                │ 【事件】               │
-│ │初二│                                          │  14:00-15:30 组会      │
-│ │●2  │  瞬间型事件数                            │                        │
-│ │▶3h │  当天任务总工时（超期任务标红）           │ 【任务】               │
-│ └────┘                                          │  毕业论文  计划 2:00   │
-│                                                 │            实际 [____] │
-│                                                 │  [暂停][完成][修改]    │
+│ │ 2  │  solar day / lunar day, festival or term │ [Events]               │
+│ │初二│                                          │  14:00-15:30 Meeting   │
+│ │●2  │  number of events                        │                        │
+│ │▶3h │  total task hours that day (red if overdue)│ [Tasks]              │
+│ └────┘                                          │  Thesis    Plan 2:00   │
+│                                                 │            Actual 1:30 │
+│                                                 │  [Log][Pause][Modify]  │
 ├─────────────────────────────────────────────────┴────────────────────────┤
-│ ←↑↓→ 移动  PgUp/PgDn 翻月  a 新建事件  n 新建任务  r 刷新  h 节假日导入 │
+│ Move / Actions / Settings key hints                                      │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-- 每周从周日开始（日 一 … 六）；对话框中的星期复选框、“每周日一三”等文字也按这个顺序。数据中的星期仍以周一为 1。
-- 放假日和补班日用不同颜色标出；格子里显示任务计划工作的星期。
-- 侧边面板：当天的事件列表；各任务当天的计划量、实际工作量输入框，以及状态按钮（暂停 / 恢复 / 完成 / 中止 / 修改），任何日期都可以操作。
+- Weeks start on Sunday (Su Mo … Sa); the weekday checkboxes in dialogs and texts such as "Weekly Su Mo We" use the same order. In the data, Monday is still 1.
+- Days off and make-up workdays are shown in different colors.
+- Sidebar: the day's events and fixed schedules; for each task, the plan and actual work for the day and its buttons.
 
-## 7. 模块划分（demo 实际结构）
+## 7. Modules (actual structure)
 
 ```
 src/
-  core/        不依赖 UI
-    date.*         日期与时长工具（std::chrono）
-    lunar.*        农历、节气、农历节日、干支生肖
-    holiday.*      节假日格式校验、提示词、HolidayCalendar
-    json.h         nlohmann::ordered_json 别名
+  core/        independent of the UI
+    date.*         date and duration helpers (std::chrono)
+    lunar.*        lunar calendar, solar terms, lunar festivals, sexagenary cycle and zodiac
+    holiday.*      holiday format validation, prompt, HolidayCalendar
+    i18n.*         multiple languages: Tr() / N_(), language file parsing
+    json.h         alias for nlohmann::ordered_json
   model/
-    day.*          Day / Event 及 JSON 转换
-    task.*         Task 日志、重放、工作量计算、校验
-    fixed.*        FixedSchedule 重复规则、JSON 转换、校验
-    preference.*   配置（国家、语言）及支持的语言列表
+    day.*          Day / Event and JSON conversion
+    task.*         Task log, replay, workload computation, validation
+    fixed.*        FixedSchedule repeat rules, JSON conversion, validation
+    preference.*   settings (country, language)
   store/
-    fs_util.*      UTF-8 路径、原子写文件
-    repository.*   读写 general/ task/ holidays/
+    fs_util.*      UTF-8 paths, atomic file writes
+    repository.*   reads and writes general/ task/ fixed/ holidays/ preference.json
   app/
-    app_state.*    应用状态：所有修改经由这里（写盘 + 重算 + version 递增）
+    app_state.*    application state: every change goes through here (write to disk + recompute + bump version)
   platform/
-    platform.*     exe 目录、剪贴板、控制台 UTF-8（Windows API）
+    platform.*     exe directory, clipboard, UTF-8 console (Windows API)
   ui/            FTXUI
-    widgets.*      公共样式与小部件（按钮、输入框、面板、中文自动换行 WrapText）
-    logo.*         像素风 logo（关于窗口）
-    month_view.*   月历网格
-    day_panel.*    侧边栏（选中日期的事件与任务）
-    overview_panel.* 右侧任务总览
-    dialogs.*      对话框基类 + 事件 / 任务 / 节假日导入
-    app.*          组装、全局快捷键、快照渲染
+    widgets.*      shared styles and widgets (buttons, inputs, panels, CJK-aware WrapText)
+    logo.*         pixel-art logo (About dialog)
+    month_view.*   month grid
+    day_panel.*    sidebar (events, fixed schedules and tasks of the selected day)
+    overview_screen.* / reminder_screen.*  full-screen task overview and reminder list
+    dialogs.*      dialog base class + event / fixed schedule / task / progress / holiday import / about
+    app.*          assembly, global keys, snapshot rendering
   main.cpp
-tests/test_main.cpp  core / model 单元测试
-res/                 exe 图标（app.rc + LookForward.ico）
-tools/make_icon.py   由 logo.cpp 的像素数据生成 res/LookForward.ico 和 docs/logo.png
+tests/test_main.cpp  core / model unit tests
+res/                 exe icon (app.rc + LookForward.ico)
+tools/make_icon.py   generates res/LookForward.ico and docs/logo.png from the pixel data in logo.cpp
+tools/i18n.py        scans the UI text in the source, generates language/EN.json, checks the other language files
+language/            language files (EN.json is the template, CN.json is Chinese)
 ```
 
-- `calendar_core` 静态库包含 UI 以外的全部代码；`LookForward`（程序本体）与 `calendar_tests` 都链接它。
-- UI 的扩展点：新面板实现为 `ComponentBase` 子类；新对话框继承 `Dialog`（自带 Esc 关闭、Tab 焦点顺序、错误行）；动态控件按 `AppState::version()` 惰性重建。
-- 开发调试：`LookForward --data <目录> --snapshot 150x40 "n,TAB,10"` 依次送入按键后，把界面渲染为文本输出。
+- The static library `calendar_core` contains everything except the UI; both `LookForward` (the program) and `calendar_tests` link it.
+- UI extension points: a new panel is a `ComponentBase` subclass; a new dialog derives from `Dialog` (Esc to close, Tab focus order and error line built in); dynamic widgets are rebuilt lazily based on `AppState::version()`.
+- Debugging: `LookForward --data <dir> --snapshot 150x40 "n,TAB,10"` feeds the keys and prints the screen as text.
 
-## 8. 已确定的决定
+## 8. Decisions
 
-1. 不考虑补班日。
-2. 今天的计划只按今天之前的实际工作量计算。
-3. 实际工作量为覆盖写入，可以随时修改，允许补录过去的日期。
-4. 超期只作为计算出的暂停状态，延长截止日期后自动恢复。
-5. 跳过节假日的任务，如果从今天到截止日期之间有年份还没导入节假日数据，就取消创建（或修改），并提示先导入。
-6. 右侧单独一栏（固定宽度）显示所有任务的总览和进度条；月历格子随窗口宽度缩放。
-7. 快捷键只用小键盘上也有的键：方向键或 `h j k l` 移动，`[ ]` 翻月，`t` 回到今天，`Tab`/`Esc` 切换面板；`a` 事件、`n` 任务、`i` 导入节假日、`c` 切换国家、`r` 刷新、`q` 退出。
-9. **事件提醒**：新建/编辑事件时可勾选“提醒”并填写提前量（`30m` / `1:30` / `2`（小时）/ `1d`，最长 30 天），保存在事件的 `remind` 字段（分钟）。
-   提醒期间为 [开始时间 − 提前量, 结束时间)；无结束时间则到开始那一分钟结束；全天事件以 0:00 为开始、到当天结束。
-   处于提醒期间的事件进入提醒列表，按发生时间排序；主界面状态栏显示提醒条数。程序每 30 秒自动刷新一次，跨零点时自动重载。
-10. **子界面**：右侧总览栏取消，改为整屏子界面。`o` 任务总览（`1` 进行中按截止日期排序、`2` 全部按创建日期排序、`3` 已完成按最终截止日期排序），`m` 提醒列表（Enter 跳到该日期）。`Esc`/`q` 返回主界面。
-11. 界面上显示任务的地方都附带 `(ID:xxxx)`。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.3.0，2026-11-03；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
-12. 任务总览中 `Enter` 查看选中任务的全部日志（按时间顺序，由 `DescribeLogEntry` 生成可读文字），`d` 删除任务文件（按 `y` 确认）。子界面自行处理返回键。主界面的快捷键提示分为“移动”和“功能”两行。
-8. 任务行的 [进行] 按钮打开对话框，填写当天的实际时长和进行内容（日志 progress 条目的 `note` 字段），覆盖写入，可以反复修改；未来日期锁定，不能填写。
-13. **v1.2.0**：程序命名为 LookForwardCalendar（简称 LFCalendar，可执行文件 `LookForward.exe`）。
-    节假日提示词要求 AI 把 JSON 放在 ```json 代码块中，能生成文件时同时生成 `<国家>_<年>.json`；导入时忽略代码块前后的说明文字。
-    侧边栏、状态栏消息、对话框提示改用 `WrapText` 自动换行（`ftxui::paragraph` 只在空格处断行，长中文不换行）；侧边栏只做纵向滚动（`yframe`）。
-    侧边栏任务的显示顺序：任务名 / ID 与状态 / 计划与实际 / 进行内容 / 按钮行（进行、暂停或恢复、修改、中止、完成），任务之间空一行。
-    像素 logo 同时作为 exe 图标：`logo.cpp` 是唯一的像素数据来源，`tools/make_icon.py` 从中生成图标（生成结果提交到仓库，编译时不需要 Python）。
-14. **v1.3.0 固定日程**：`f` 新建（开始日期默认选中日期，重复默认每周、星期默认开始日期的星期）。
-    月历格子第三行用青色 `◆n` 显示固定日程数；侧边栏在事件和任务之间显示【固定日程】，每项为时间段、工作内容、重复方式、备注和 [删]。
-    [删] 删除整个固定日程，需按两次（第一次变为 [确认删除] 并在状态栏提示），侧边栏重建（切换日期或数据变化）时取消待确认状态。
-    固定日程的 id 与任务 id 共用生成器，互不重复。暂不支持修改、跳过节假日和提醒。
-15. **配置**：`data/preference.json` 保存当前的国家和语言，启动和刷新（`r`）时读取，`c` 切换国家、`g` 切换语言后立即写回。
-    文件不存在时使用默认值（中国、中文）；不支持的值回退为默认值并在状态栏提示。语言目前只有中文，按 `g` 只提示。
-    状态栏快捷键提示分为三行：“移动”、“功能”、“配置”（`c` 国家、`g` 语言、`i` 节假日）。
+1. Make-up workdays are ignored.
+2. Today's plan uses only actual work logged before today.
+3. Actual work overwrites, can be changed any time, and past dates can be filled in.
+4. Overdue is only a computed paused state; extending the due date resumes the task.
+5. For a task that skips holidays, if holiday data is missing for any year between today and the due date, creating (or modifying) is cancelled and the user is asked to import it first.
+6. (Superseded by 10) A fixed-width column on the right showed every task with a progress bar; calendar cells scale with the window width.
+7. Keys are limited to those on small keyboards: arrows or `h j k l` to move, `[ ]` to change month, `t` for today, `Tab`/`Esc` to switch panes; `a` event, `n` task, `i` import holidays, `c` switch holiday config, `r` refresh, `q` quit.
+8. The [Log] button of a task opens a dialog for the day's actual time and a note (`note` of a progress log entry); it overwrites and can be changed again; future dates are locked.
+9. **Event reminders**: when creating/editing an event, tick "Remind" and enter a lead time (`30m` / `1:30` / `2` (hours) / `1d`, up to 30 days), stored in the event's `remind` field (minutes).
+   The reminder period is [start − lead time, end); without an end time it ends at the start minute; an all-day event starts at 0:00 and lasts until the end of the day.
+   Events in their reminder period go into the reminder list, sorted by time; the status bar shows how many. The program refreshes every 30 seconds and reloads when the date changes at midnight.
+10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
+11. Every place that shows a task also shows `(ID:xxxx)`. `v` opens the version information; the version is in `src/version.h` (currently v1.4.0, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
+12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
+13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`).
+    The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create `<country>_<year>.json`; import ignores text around the code block.
+    The sidebar, status bar messages and dialog hints wrap with `WrapText` (`ftxui::paragraph` only breaks at spaces, so long Chinese text never wrapped); the sidebar scrolls only vertically (`yframe`).
+    Order of a task in the sidebar: name / ID and status / plan and actual / progress note / button row (Log, Pause or Resume, Modify, Abort, Done), with a blank line between tasks.
+    The pixel logo is also the exe icon: `logo.cpp` is the single source of the pixel data, and `tools/make_icon.py` generates the icon from it (the result is committed, so building does not need Python).
+14. **v1.3.0 fixed schedules**: `f` creates one (start date defaults to the selected day, repeat to weekly, the weekday to the start date's weekday).
+    The third line of a calendar cell shows the count as a cyan `◆n`; the sidebar shows [Fixed schedules] between events and tasks, each with its time, work content, repeat rule, note and [Del].
+    [Del] deletes the whole schedule and needs two presses (the first turns it into [Confirm delete] and shows a hint in the status bar); rebuilding the sidebar (changing the day or the data) cancels the pending confirmation.
+    Fixed schedule ids and task ids share one generator and never collide. Editing, skipping holidays and reminders are not supported yet.
+15. **Settings**: `data/preference.json` stores the current country and language; it is read at startup and on refresh (`r`), and written as soon as `c` (holiday config) or `g` (language) changes it.
+    Without the file the defaults are used (China, English); an unsupported country falls back to the default with a hint in the status bar.
+    The key hints in the status bar have three lines: "Move", "Actions", "Settings" (`c` switch holidays, `g` language, `i` import holidays).
+    The UI calls the holidays shown on the calendar "Holiday config 1 / 2" without naming the country; the number is the country's position in `SupportedCountries()` (1 = CN, 2 = JP), and `preference.json` still stores the country code.
+16. **v1.4.0 multiple languages**: all fixed text in the program goes through `Tr()`, with the English text as the key; `language/<name>.json` is a flat `{ key: translation }` object.
+    - The default language is EN; in `EN.json` every key equals its value. It is the translation template and is generated from the source by `tools/i18n.py` (which scans `Tr("…")` and `N_("…")`). `CN.json` is included.
+    - Variable parts use named placeholders `{name}`, so translations can reorder them; missing keys show the English text.
+    - The special key `" "` is the word separator (weekday abbreviations, durations), an empty string in Chinese; the translation of the key `"English"` is the language's own name.
+    - Text in constant tables (country names, weekdays, months, tab labels) is marked with `N_()` and passed to `Tr()` where used.
+    - `g` cycles through the `*.json` files in `language/` in file-name order and writes the file name (e.g. `"CN"`) to `language` in `preference.json`; `"zh-CN"` from v1.3.0 maps to `CN`.
+    - Buttons and labels get their text when constructed, so after a language switch `App` leaves the event loop and `RunApp` constructs the whole UI again; `AppState` (data, selected day) is kept.
+    - A missing or malformed language file falls back to English with a hint in the status bar. Lunar names, solar terms and holiday names are not translated.
+    - Unit tests check that keys equal values in `EN.json` and that `CN.json` covers every key with the same placeholders.
+    - English is longer than Chinese: dialogs are wider, form labels are 16 columns, and the status and weekday columns of the task overview are wider.
+    - README and the design document each have an English and a Chinese version: `README.md` / `README_CN.md`, `docs/design.md` / `docs/design_CN.md`.
 
-## 9. 后续可做
+## 9. Possible future work
 
-- 事件 / 任务的更多编辑功能（例如复制事件、任务改名同步）
-- 过去日期回放当时的计划量（日志重放到该日）
-- 总览栏可聚焦、可直接操作
-- 鼠标点击选择日期
+- More editing (copying events, editing fixed schedules, keeping task renames in sync)
+- Replaying the plan of a past date (replay the log up to that day)
+- Clicking a date with the mouse

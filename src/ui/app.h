@@ -16,6 +16,8 @@ class App {
  public:
   App(AppState& state, std::function<void()> on_quit);
   ftxui::Component root() const { return root_; }
+  // 切换了语言，需要重建界面
+  bool restart_requested() const { return restart_; }
 
  private:
   AppState& state_;
@@ -27,6 +29,7 @@ class App {
   AboutDialog about_dialog_;
   int view_ = 0;  // 主界面 / 任务总览 / 提醒列表
   int pane_ = 0;  // 主界面中：月历 / 侧边栏
+  bool restart_ = false;
   ftxui::Component root_;
 };
 

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "core/i18n.h"
+
 namespace cal {
 
 namespace {
@@ -11,7 +13,7 @@ std::expected<Json, std::string> ReadJsonFile(const fs::path& p) {
   auto text = ReadTextFile(p);
   if (!text) return std::unexpected(text.error());
   Json j = Json::parse(*text, nullptr, /*allow_exceptions=*/false);
-  if (j.is_discarded()) return std::unexpected(PathToUtf8(p.filename()) + " 不是合法的 JSON");
+  if (j.is_discarded()) return std::unexpected(Tr("{file} is not valid JSON", {{"file", PathToUtf8(p.filename())}}));
   return j;
 }
 
@@ -41,7 +43,7 @@ std::expected<MonthDays, std::string> Repository::LoadMonth(int year, unsigned m
   auto j = ReadJsonFile(p);
   if (!j) return std::unexpected(j.error());
   auto days = MonthDaysFromJson(*j);
-  if (!days) return std::unexpected(PathToUtf8(p.filename()) + "：" + days.error());
+  if (!days) return std::unexpected(Tr("{file}: {error}", {{"file", PathToUtf8(p.filename())}, {"error", days.error()}}));
   return days;
 }
 
@@ -60,7 +62,7 @@ std::vector<Task> Repository::LoadTasks(std::vector<std::string>& warnings) cons
     }
     auto task = TaskFromJson(*j, PathToUtf8(p.stem()));
     if (!task) {
-      warnings.push_back("任务 " + PathToUtf8(p.filename()) + "：" + task.error());
+      warnings.push_back(Tr("Task {file}: {error}", {{"file", PathToUtf8(p.filename())}, {"error", task.error()}}));
       continue;
     }
     tasks.push_back(std::move(*task));
@@ -77,7 +79,7 @@ std::expected<void, std::string> Repository::DeleteTask(const Task& task) const 
   const fs::path p = root_ / "task" / PathFromUtf8(task.file_stem + ".json");
   std::error_code ec;
   fs::remove(p, ec);
-  if (ec) return std::unexpected("无法删除文件：" + PathToUtf8(p));
+  if (ec) return std::unexpected(Tr("Cannot delete file: {path}", {{"path", PathToUtf8(p)}}));
   return {};
 }
 
@@ -91,7 +93,7 @@ std::vector<FixedSchedule> Repository::LoadFixed(std::vector<std::string>& warni
     }
     auto f = FixedFromJson(*j, PathToUtf8(p.stem()));
     if (!f) {
-      warnings.push_back("固定日程 " + PathToUtf8(p.filename()) + "：" + f.error());
+      warnings.push_back(Tr("Fixed schedule {file}: {error}", {{"file", PathToUtf8(p.filename())}, {"error", f.error()}}));
       continue;
     }
     list.push_back(std::move(*f));
@@ -107,7 +109,7 @@ std::expected<void, std::string> Repository::DeleteFixed(const FixedSchedule& f)
   const fs::path p = root_ / "fixed" / PathFromUtf8(f.file_stem + ".json");
   std::error_code ec;
   fs::remove(p, ec);
-  if (ec) return std::unexpected("无法删除文件：" + PathToUtf8(p));
+  if (ec) return std::unexpected(Tr("Cannot delete file: {path}", {{"path", PathToUtf8(p)}}));
   return {};
 }
 
@@ -117,7 +119,7 @@ Preference Repository::LoadPreference(std::vector<std::string>& warnings) const 
   if (!fs::exists(p, ec)) return {};
   auto j = ReadJsonFile(p);
   if (!j) {
-    warnings.push_back(j.error() + "，已使用默认配置");
+    warnings.push_back(Tr("{error}, using defaults", {{"error", j.error()}}));
     return {};
   }
   return PreferenceFromJson(*j, warnings);
@@ -137,7 +139,7 @@ HolidayCalendar Repository::LoadHolidays(std::vector<std::string>& warnings) con
     }
     auto hy = ParseHolidayYear(*text);
     if (!hy) {
-      warnings.push_back("节假日 " + PathToUtf8(p.filename()) + "：" + hy.error());
+      warnings.push_back(Tr("Holidays {file}: {error}", {{"file", PathToUtf8(p.filename())}, {"error", hy.error()}}));
       continue;
     }
     cal.Set(std::move(*hy));
