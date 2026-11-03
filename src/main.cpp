@@ -35,7 +35,7 @@ std::vector<ftxui::Event> ParseKeys(const std::string& spec) {
 
 }  // namespace
 
-// 用法：calendar [--data <数据目录>] [--snapshot <宽>x<高> [按键序列]]
+// 用法：LookForward [--data <数据目录>] [--snapshot <宽>x<高> [按键序列]]
 // 默认数据目录为 exe 所在目录下的 data/
 int main(int argc, char** argv) {
   cal::InitConsole();

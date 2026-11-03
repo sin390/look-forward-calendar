@@ -33,7 +33,7 @@ class DayPanelBase : public ComponentBase {
   Element OnRender() override {
     EnsureBuilt();
     return Panel(ShortDate(s_.selected()) + " " + WeekdayName(IsoWeekday(s_.selected())),
-                 vbox({Header(), separatorLight(), body_->Render() | vscroll_indicator | frame | flex}),
+                 vbox({Header(), separatorLight(), body_->Render() | vscroll_indicator | yframe | flex}),
                  Focused());
   }
 
@@ -59,11 +59,11 @@ class DayPanelBase : public ComponentBase {
                            LunarMonthName(*ld) + LunarDayName(ld->day)));
       std::string extra = LunarFestival(*ld);
       if (auto t = SolarTerm(d); !t.empty()) extra += (extra.empty() ? "" : " ") + t;
-      if (!extra.empty()) lines.push_back(text(extra) | color(Color::Yellow));
+      if (!extra.empty()) lines.push_back(WrapText(extra) | color(Color::Yellow));
     }
     for (const Country& c : SupportedCountries()) {
       if (const HolidayDay* h = s_.holidays().Find(c.code, d))
-        lines.push_back(text(c.name + "：" + h->name + (h->off ? "（休）" : "（班）")) |
+        lines.push_back(WrapText(c.name + "：" + h->name + (h->off ? "（休）" : "（班）")) |
                         color(h->off ? Color::Red : Color::Blue));
     }
     return vbox(std::move(lines));
@@ -87,11 +87,11 @@ class DayPanelBase : public ComponentBase {
         rows.push_back(Renderer(row, [ev, edit, del] {
           Elements left = {text(EventTimeText(ev).empty() ? "全天" : EventTimeText(ev)) |
                                color(Color::Magenta) | size(WIDTH, EQUAL, 12),
-                           text(ev.title) | flex};
+                           WrapText(ev.title) | flex};
           auto top = hbox({hbox(std::move(left)) | flex, edit->Render(), del->Render()});
           Elements lines = {top};
           if (ev.remind) lines.push_back(text("  ⏰ 提前" + FormatLead(*ev.remind)) | color(Color::Yellow));
-          if (!ev.note.empty()) lines.push_back(text("  " + ev.note) | dim);
+          if (!ev.note.empty()) lines.push_back(hbox({text("  "), WrapText(ev.note) | flex}) | dim);
           return vbox(std::move(lines));
         }));
       }
@@ -129,30 +129,27 @@ class DayPanelBase : public ComponentBase {
 
     // [进行]：填写当天实际进行情况，可反复修改；未来日期锁定（不可聚焦）
     const bool locked = d > today;
-    Component progress;
-    if (!locked) {
-      progress = Button("进行", [this, id, d] { actions_.edit_progress(id, d); }, SmallButton());
-      controls.push_back(progress);
-    }
+    if (!locked)
+      controls.push_back(Button("进行", [this, id, d] { actions_.edit_progress(id, d); }, SmallButton()));
 
-    // 状态按钮
+    // 状态按钮，顺序：进行、暂停/恢复、修改、中止、完成
     const bool ended = entry.state.ended.has_value();
     if (!ended) {
       if (entry.state.status == TaskStatus::kPaused)
         controls.push_back(Button("恢复", [this, id] { ChangeStatus(id, "resume", "已恢复"); }, SmallButton()));
       else if (!entry.plan.overdue)
         controls.push_back(Button("暂停", [this, id] { ChangeStatus(id, "pause", "已暂停"); }, SmallButton()));
-      controls.push_back(Button("完成", [this, id] { ChangeStatus(id, "complete", "已完成"); }, SmallButton()));
-      controls.push_back(Button("中止", [this, id] { ChangeStatus(id, "abort", "已中止"); }, SmallButton()));
       controls.push_back(Button("修改", [this, id] { actions_.edit_task(id); }, SmallButton()));
+      controls.push_back(Button("中止", [this, id] { ChangeStatus(id, "abort", "已中止"); }, SmallButton()));
+      controls.push_back(Button("完成", [this, id] { ChangeStatus(id, "complete", "已完成"); }, SmallButton()));
     }
 
     auto row = Container::Horizontal(controls);
-    return Renderer(row, [this, id, d, today, locked, progress, controls] {
+    return Renderer(row, [this, id, d, today, locked, controls] {
       const TaskEntry* e = s_.FindTask(id);
       if (!e) return text("");
-      auto title = hbox({text(e->task.name) | bold, text(" " + IdTag(id)) | dim, filler(),
-                         text(StatusText(e->state, e->plan, today)) | color(StatusColor(*e))});
+      auto id_status = hbox({text(IdTag(id)) | dim, filler(),
+                             text(StatusText(e->state, e->plan, today)) | color(StatusColor(*e))});
 
       std::string plan_text = "-";
       if (e->plan.overdue) {
@@ -164,20 +161,17 @@ class DayPanelBase : public ComponentBase {
           plan_text = "休";
       }
       const DayProgress done = e->state.ProgressOn(d);
-      Element progress_button =
-          locked ? hbox({text("[进行]") | dim | strikethrough, text("锁") | dim}) : progress->Render();
-      auto line2 = hbox({text(" 计划 " + plan_text) | size(WIDTH, EQUAL, 12),
-                         text("实际 " + (locked ? std::string("-") : FormatMinutes(done.minutes))) |
-                             size(WIDTH, EQUAL, 12),
-                         filler(), progress_button});
+      auto amounts = hbox({text(" 计划 " + plan_text) | size(WIDTH, EQUAL, 12),
+                           text("实际 " + (locked ? std::string("-") : FormatMinutes(done.minutes)))});
 
       Elements buttons;
-      for (const Component& c : controls)
-        if (c != progress) buttons.push_back(c->Render());
+      if (locked) buttons.push_back(hbox({text("[进行]") | dim | strikethrough, text("锁") | dim}));
+      for (const Component& c : controls) buttons.push_back(c->Render());
 
-      Elements lines = {title, line2};
-      if (!done.note.empty()) lines.push_back(paragraph(" 内容：" + done.note) | dim);
-      if (!buttons.empty()) lines.push_back(hbox(std::move(buttons)));
+      Elements lines = {WrapText(e->task.name) | bold, id_status, amounts};
+      if (!done.note.empty()) lines.push_back(WrapText(" 内容：" + done.note) | dim);
+      lines.push_back(hbox(std::move(buttons)));
+      lines.push_back(text(""));  // 任务之间空一行
       return vbox(std::move(lines));
     });
   }

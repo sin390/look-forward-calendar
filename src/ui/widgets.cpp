@@ -1,6 +1,7 @@
 #include "ui/widgets.h"
 
 #include <array>
+#include <utility>
 
 using namespace ftxui;
 
@@ -34,6 +35,39 @@ Element Panel(const std::string& title, Element body, bool focused) {
   auto t = text(" " + title + " ") | bold;
   if (focused) t |= color(Color::Cyan);
   return window(t, std::move(body));
+}
+
+Element WrapText(std::string_view s) {
+  Elements lines;
+  size_t line_start = 0;
+  while (line_start <= s.size()) {
+    size_t line_end = s.find('\n', line_start);
+    if (line_end == std::string_view::npos) line_end = s.size();
+    const std::string_view line = s.substr(line_start, line_end - line_start);
+
+    // 断行单位：连续的 ASCII 非空白字符（单词）或单个非 ASCII 字符；空格附在前一个单位后面
+    Elements pieces;
+    std::string piece;
+    for (size_t i = 0; i < line.size();) {
+      const auto c = static_cast<unsigned char>(line[i]);
+      const size_t len = c < 0x80 ? 1 : c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : 2;
+      const std::string_view glyph = line.substr(i, len);
+      i += len;
+      if (c == ' ') {
+        piece += ' ';
+        pieces.push_back(text(std::exchange(piece, {})));
+      } else if (c < 0x80) {
+        piece += glyph;
+      } else {
+        if (!piece.empty()) pieces.push_back(text(std::exchange(piece, {})));
+        pieces.push_back(text(std::string(glyph)));
+      }
+    }
+    if (!piece.empty()) pieces.push_back(text(piece));
+    lines.push_back(pieces.empty() ? text("") : flexbox(std::move(pieces)));
+    line_start = line_end + 1;
+  }
+  return lines.size() == 1 ? std::move(lines.front()) : vbox(std::move(lines));
 }
 
 std::string WeekdayName(int iso_weekday) {

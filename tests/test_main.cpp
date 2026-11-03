@@ -87,7 +87,10 @@ void TestHoliday() {
   CHECK(!cal.IsOff("CN", D("2026-10-10")));
   CHECK(cal.Has("CN", 2026));
   CHECK(!cal.Has("CN", 2027));
+  // 代码块前后带说明文字时也能取出 JSON
+  CHECK(ParseHolidayYear(std::string("好的，如下：\n") + text + "\n以上为官方安排。", "CN", 2026).has_value());
   CHECK(HolidayPrompt("JP", 2027).find("日本2027年") != std::string::npos);
+  CHECK(HolidayPrompt("JP", 2027).find("JP_2027.json") != std::string::npos);
 }
 
 TaskSpec Spec(int minutes, const char* due) {

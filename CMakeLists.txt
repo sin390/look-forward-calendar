@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(calendar VERSION 1.1.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
+project(LFCalendar VERSION 1.2.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,7 +33,7 @@ add_library(calendar_core STATIC
 target_include_directories(calendar_core PUBLIC src)
 target_link_libraries(calendar_core PUBLIC nlohmann_json::nlohmann_json)
 
-add_executable(calendar
+add_executable(LookForward
   src/main.cpp
   src/ui/app.cpp
   src/ui/month_view.cpp
@@ -42,17 +42,24 @@ add_executable(calendar
   src/ui/reminder_screen.cpp
   src/ui/dialogs.cpp
   src/ui/widgets.cpp
+  src/ui/logo.cpp
 )
-target_link_libraries(calendar PRIVATE
+target_link_libraries(LookForward PRIVATE
   calendar_core
   ftxui::screen
   ftxui::dom
   ftxui::component
 )
 
+if(WIN32)
+  # exe 图标（res/LookForward.ico 由 tools/make_icon.py 生成）
+  enable_language(RC)
+  target_sources(LookForward PRIVATE res/app.rc)
+endif()
+
 if(MINGW)
   # 静态链接运行时，生成的 exe 可脱离 MinGW 环境直接运行
-  target_link_options(calendar PRIVATE -static)
+  target_link_options(LookForward PRIVATE -static)
 endif()
 
 enable_testing()

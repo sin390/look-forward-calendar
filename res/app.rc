@@ -1,0 +1,2 @@
+// exe 图标，由 tools/make_icon.py 根据 src/ui/logo.cpp 的像素数据生成
+IDI_APP_ICON ICON "LookForward.ico"

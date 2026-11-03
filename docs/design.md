@@ -1,6 +1,6 @@
 # 日历程序设计文档
 
-基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 长期任务）+ 农历 + 中日节假日。
+LookForwardCalendar（LFCalendar），基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 长期任务）+ 农历 + 中日节假日。
 
 ## 1. 技术栈
 
@@ -141,8 +141,9 @@ N = 今天 到 截止日期 之间的工作日数（包括今天）
 ### 5.3 提示词模板（程序内置，`{COUNTRY}` / `{COUNTRY_NAME}` / `{YEAR}` 会被替换）
 
 ```
-请列出{COUNTRY_NAME}{YEAR}年全年的法定节假日安排，严格按照下面的 JSON 格式输出，
-不要输出 JSON 以外的任何文字，也不要使用 Markdown 代码块。
+请列出{COUNTRY_NAME}{YEAR}年全年的法定节假日安排，严格按照下面的 JSON 格式，
+把完整的 JSON 放在一个 ```json 代码块中输出，代码块外不要输出其他文字。
+如果你能够生成文件，请同时生成一个名为 {COUNTRY}_{YEAR}.json 的文件供下载，内容与代码块中的 JSON 完全相同。
 
 {
   "country": "{COUNTRY}",
@@ -203,7 +204,8 @@ src/
   platform/
     platform.*     exe 目录、剪贴板、控制台 UTF-8（Windows API）
   ui/            FTXUI
-    widgets.*      公共样式与小部件（按钮、输入框、面板）
+    widgets.*      公共样式与小部件（按钮、输入框、面板、中文自动换行 WrapText）
+    logo.*         像素风 logo（关于窗口）
     month_view.*   月历网格
     day_panel.*    侧边栏（选中日期的事件与任务）
     overview_panel.* 右侧任务总览
@@ -211,11 +213,13 @@ src/
     app.*          组装、全局快捷键、快照渲染
   main.cpp
 tests/test_main.cpp  core / model 单元测试
+res/                 exe 图标（app.rc + LookForward.ico）
+tools/make_icon.py   由 logo.cpp 的像素数据生成 res/LookForward.ico 和 docs/logo.png
 ```
 
-- `calendar_core` 静态库包含 UI 以外的全部代码；`calendar` 与 `calendar_tests` 都链接它。
+- `calendar_core` 静态库包含 UI 以外的全部代码；`LookForward`（程序本体）与 `calendar_tests` 都链接它。
 - UI 的扩展点：新面板实现为 `ComponentBase` 子类；新对话框继承 `Dialog`（自带 Esc 关闭、Tab 焦点顺序、错误行）；动态控件按 `AppState::version()` 惰性重建。
-- 开发调试：`calendar --data <目录> --snapshot 150x40 "n,TAB,10"` 依次送入按键后，把界面渲染为文本输出。
+- 开发调试：`LookForward --data <目录> --snapshot 150x40 "n,TAB,10"` 依次送入按键后，把界面渲染为文本输出。
 
 ## 8. 已确定的决定
 
@@ -230,9 +234,14 @@ tests/test_main.cpp  core / model 单元测试
    提醒期间为 [开始时间 − 提前量, 结束时间)；无结束时间则到开始那一分钟结束；全天事件以 0:00 为开始、到当天结束。
    处于提醒期间的事件进入提醒列表，按发生时间排序；主界面状态栏显示提醒条数。程序每 30 秒自动刷新一次，跨零点时自动重载。
 10. **子界面**：右侧总览栏取消，改为整屏子界面。`o` 任务总览（`1` 进行中按截止日期排序、`2` 全部按创建日期排序、`3` 已完成按最终截止日期排序），`m` 提醒列表（Enter 跳到该日期）。`Esc`/`q` 返回主界面。
-11. 界面上显示任务的地方都附带 `(ID:xxxx)`。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.1.0，2026-11-03；关于窗口显示编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
+11. 界面上显示任务的地方都附带 `(ID:xxxx)`。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.2.0，2026-11-03；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
 12. 任务总览中 `Enter` 查看选中任务的全部日志（按时间顺序，由 `DescribeLogEntry` 生成可读文字），`d` 删除任务文件（按 `y` 确认）。子界面自行处理返回键。主界面的快捷键提示分为“移动”和“功能”两行。
 8. 任务行的 [进行] 按钮打开对话框，填写当天的实际时长和进行内容（日志 progress 条目的 `note` 字段），覆盖写入，可以反复修改；未来日期锁定，不能填写。
+13. **v1.2.0**：程序命名为 LookForwardCalendar（简称 LFCalendar，可执行文件 `LookForward.exe`）。
+    节假日提示词要求 AI 把 JSON 放在 ```json 代码块中，能生成文件时同时生成 `<国家>_<年>.json`；导入时忽略代码块前后的说明文字。
+    侧边栏、状态栏消息、对话框提示改用 `WrapText` 自动换行（`ftxui::paragraph` 只在空格处断行，长中文不换行）；侧边栏只做纵向滚动（`yframe`）。
+    侧边栏任务的显示顺序：任务名 / ID 与状态 / 计划与实际 / 进行内容 / 按钮行（进行、暂停或恢复、修改、中止、完成），任务之间空一行。
+    像素 logo 同时作为 exe 图标：`logo.cpp` 是唯一的像素数据来源，`tools/make_icon.py` 从中生成图标（生成结果提交到仓库，编译时不需要 Python）。
 
 ## 9. 后续可做
 

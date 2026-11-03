@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 编译日历程序并运行单元测试。
+# 编译 LookForward 并运行单元测试。
 #
 # 用法：
 #   ./build.sh          配置 + 编译 + 运行单元测试
@@ -24,11 +24,11 @@ echo "==> 单元测试"
 ./build/calendar_tests.exe
 
 echo
-echo "编译完成：build/calendar.exe（数据目录：build/data/）"
+echo "编译完成：build/LookForward.exe（数据目录：build/data/）"
 
 if [[ "${1:-}" == "run" ]]; then
   # Git Bash 的终端（mintty）不是 Windows 控制台，FTXUI 无法正常接收按键，
   # 因此在新的控制台窗口中启动
   echo "==> 在新窗口中启动"
-  cmd //c start "" "build\\calendar.exe"
+  cmd //c start "" "build\\LookForward.exe"
 fi

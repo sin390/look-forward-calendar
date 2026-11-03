@@ -24,6 +24,9 @@ ftxui::Element InputBox(ftxui::Component input, int width);
 ftxui::Element FormRow(const std::string& label, ftxui::Element field);
 // 面板外框，聚焦时高亮标题
 ftxui::Element Panel(const std::string& title, ftxui::Element body, bool focused);
+// 按可用宽度自动换行的文本。中文可在任意字之间断行，英文单词不拆开；
+// ftxui::paragraph 只在空格处断行，长中文不会换行
+ftxui::Element WrapText(std::string_view s);
 
 std::string WeekdayName(int iso_weekday);  // 1 -> "周一"
 std::string IdTag(const std::string& task_id);  // "(ID:a3f9)"

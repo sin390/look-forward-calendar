@@ -40,7 +40,7 @@ Element StatusBar(AppState& s, int view, int pane) {
 
   Elements lines;
   for (const std::string& h : hints) lines.push_back(text(h) | dim);
-  auto msg = text(s.message());
+  auto msg = WrapText(s.message());
   if (s.message_is_error()) msg |= color(Color::Red);
   Element reminder = text("");
   if (const size_t n = s.ActiveReminders(NowLocal()).size(); n > 0)

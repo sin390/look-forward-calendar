@@ -8,6 +8,7 @@
 
 #include "platform/platform.h"
 #include "version.h"
+#include "ui/logo.h"
 #include "ui/widgets.h"
 
 using namespace ftxui;
@@ -89,7 +90,7 @@ void Dialog::MoveFocus(int dir) {
 }
 
 Element Dialog::ErrorLine() const {
-  return error_.empty() ? text("") : paragraph(error_) | color(Color::Red);
+  return error_.empty() ? text("") : WrapText(error_) | color(Color::Red);
 }
 
 // ---------------------------------------------------------------- EventDialog
@@ -323,10 +324,9 @@ AboutDialog::AboutDialog() {
   auto close = Button("关闭", [this] { Close(); }, SmallButton());
   Build("关于", close, [close] {
     return vbox({
-               text(std::string(kAppName) + "  v" + kVersion) | bold | hcenter,
-               text(std::string("发布日期 ") + kReleaseDate) | dim | hcenter,
+               LogoBanner() | hcenter,
                separatorLight(),
-               paragraph(kCredits),
+               WrapText(kCredits),
                text(""),
                text(std::string("编写模型：") + kModel),
                text("基于 FTXUI 7 与 nlohmann/json，C++23") | dim,
@@ -368,7 +368,7 @@ HolidayDialog::HolidayDialog(AppState& s) : s_(s), country_names_(CountryNames()
       body.push_back(vbox(std::move(prompt_lines)) | dim | yframe | size(HEIGHT, LESS_THAN, 12) | border);
     body.push_back(FormRow("② 文件路径", InputBox(path, 48)));
     body.push_back(text("   同一国家同一年份的旧数据会被整体覆盖") | dim);
-    if (!info_.empty()) body.push_back(paragraph(info_) | color(Color::Green));
+    if (!info_.empty()) body.push_back(WrapText(info_) | color(Color::Green));
     body.push_back(ErrorLine());
     body.push_back(separatorLight());
     body.push_back(Buttons(import_btn, close));

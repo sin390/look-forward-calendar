@@ -6,15 +6,15 @@ namespace cal {
 
 namespace {
 
-// 去掉 AI 可能包裹的 ```json ... ``` 代码块
+// 取出 ```json ... ``` 代码块中的内容；代码块前后的说明文字一并忽略
 std::string_view StripCodeFence(std::string_view s) {
   s = Trim(s);
-  if (!s.starts_with("```")) return s;
-  const auto first_newline = s.find('\n');
+  const auto open = s.find("```");
+  if (open == std::string_view::npos) return s;
+  const auto first_newline = s.find('\n', open);
   if (first_newline == std::string_view::npos) return s;
   s.remove_prefix(first_newline + 1);
-  s = Trim(s);
-  if (s.ends_with("```")) s.remove_suffix(3);
+  if (const auto close = s.find("```"); close != std::string_view::npos) s = s.substr(0, close);
   return Trim(s);
 }
 
@@ -23,8 +23,9 @@ void ReplaceAll(std::string& s, std::string_view from, std::string_view to) {
     s.replace(pos, from.size(), to);
 }
 
-constexpr std::string_view kPromptTemplate = R"PROMPT(请列出{COUNTRY_NAME}{YEAR}年全年的法定节假日安排，严格按照下面的 JSON 格式输出，
-不要输出 JSON 以外的任何文字，也不要使用 Markdown 代码块。
+constexpr std::string_view kPromptTemplate = R"PROMPT(请列出{COUNTRY_NAME}{YEAR}年全年的法定节假日安排，严格按照下面的 JSON 格式，
+把完整的 JSON 放在一个 ```json 代码块中输出，代码块外不要输出其他文字。
+如果你能够生成文件，请同时生成一个名为 {COUNTRY}_{YEAR}.json 的文件供下载，内容与代码块中的 JSON 完全相同。
 
 {
   "country": "{COUNTRY}",
