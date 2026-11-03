@@ -30,7 +30,7 @@ Json SpecFieldsDiff(const TaskSpec& before, const TaskSpec& after, bool all) {
   if (all || before.due != after.due) f["due"] = FormatDate(after.due);
   if (all || before.weekdays != after.weekdays) f["weekdays"] = WeekdaysToJson(after.weekdays);
   if (all || before.skip_holiday != after.skip_holiday) f["skip_holiday"] = after.skip_holiday;
-  if (all || before.country != after.country) f["country"] = after.country;
+  if (all || before.holiday_config != after.holiday_config) f["holiday_config"] = after.holiday_config;
   return f;
 }
 
@@ -52,7 +52,12 @@ std::optional<std::string> ApplySpecFields(TaskSpec& spec, const Json& f) {
       }
     }
     if (f.contains("skip_holiday")) spec.skip_holiday = f["skip_holiday"].get<bool>();
-    if (f.contains("country")) spec.country = f["country"].get<std::string>();
+    if (f.contains("holiday_config")) {
+      spec.holiday_config = f["holiday_config"].get<int>();
+      if (!IsHolidayConfig(spec.holiday_config)) return Tr("invalid holiday_config");
+    } else if (f.contains("country")) {
+      spec.holiday_config = f["country"].get<std::string>() == "JP" ? 2 : 1;  // v1.5.0 之前：CN → 配置1，JP → 配置2
+    }
   } catch (const nlohmann::json::exception&) {
     return Tr("wrong type in task fields");
   }
@@ -167,7 +172,7 @@ std::expected<TaskState, std::string> Replay(const Task& task) {
 
 bool IsWorkday(const TaskSpec& spec, Date d, const HolidayCalendar& holidays) {
   if (!spec.weekdays[static_cast<size_t>(IsoWeekday(d) - 1)]) return false;
-  return !(spec.skip_holiday && holidays.IsOff(spec.country, d));
+  return !(spec.skip_holiday && holidays.IsOff(spec.holiday_config, d));
 }
 
 TaskPlan ComputePlan(const TaskState& state, Date today, const HolidayCalendar& holidays) {
@@ -200,19 +205,13 @@ bool ShowsOn(const TaskState& state, Date d, Date today) {
   return d <= state.spec.due || d <= today || state.progress.contains(d);
 }
 
-std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today, const HolidayCalendar& holidays) {
+std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today) {
   if (Trim(spec.name).empty()) return Tr("Task name cannot be empty");
   if (spec.total_minutes <= 0) return Tr("Planned hours must be greater than 0");
   if (!spec.due.ok()) return Tr("Invalid due date");
   if (spec.due < today) return Tr("Due date cannot be earlier than today");
   if (std::none_of(spec.weekdays.begin(), spec.weekdays.end(), [](bool b) { return b; }))
     return Tr("Select at least one workday");
-  if (spec.skip_holiday) {
-    for (int y = YearNum(today); y <= YearNum(spec.due); ++y)
-      if (!holidays.Has(spec.country, y))
-        return Tr("Missing {country} holiday data for {year}; cancelled. Press i to import it first.",
-                  {{"country", CountryName(spec.country)}, {"year", std::to_string(y)}});
-  }
   return std::nullopt;
 }
 
@@ -234,7 +233,10 @@ std::string DescribeSpecFields(const Json& f, const char* arrow) {
     }
     if (f.contains("skip_holiday"))
       parts.push_back(f["skip_holiday"].get<bool>() ? Tr("Skip holidays") : Tr("Don't skip holidays"));
-    if (f.contains("country")) parts.push_back(Tr("Holiday country") + arrow + CountryName(f["country"].get<std::string>()));
+    if (f.contains("holiday_config"))
+      parts.push_back(Tr("Holiday config") + arrow + HolidayConfigShortName(f["holiday_config"].get<int>()));
+    else if (f.contains("country"))
+      parts.push_back(Tr("Holiday config") + arrow + HolidayConfigShortName(f["country"].get<std::string>() == "JP" ? 2 : 1));
   } catch (const nlohmann::json::exception&) {
     parts.push_back(Tr("(invalid field format)"));
   }

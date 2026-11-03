@@ -26,6 +26,7 @@ class App {
   TaskDialog task_dialog_;
   ProgressDialog progress_dialog_;
   HolidayDialog holiday_dialog_;
+  SloganDialog slogan_dialog_;
   AboutDialog about_dialog_;
   int view_ = 0;  // 主界面 / 任务总览 / 提醒列表
   int pane_ = 0;  // 主界面中：月历 / 侧边栏

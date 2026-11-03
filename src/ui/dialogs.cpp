@@ -19,17 +19,11 @@ using ftxui::Event;  // 键盘事件；数据模型的事件写作 cal::Event
 
 namespace {
 
-std::vector<std::string> CountryNames() {
+// 节假日配置的选项：节假日配置1、节假日配置2 …
+std::vector<std::string> HolidayConfigNames() {
   std::vector<std::string> names;
-  for (const Country& c : SupportedCountries()) names.push_back(CountryName(c.code));
+  for (int config = 1; config <= kHolidayConfigCount; ++config) names.push_back(HolidayConfigName(config));
   return names;
-}
-
-int CountryIndex(std::string_view code) {
-  const auto& list = SupportedCountries();
-  for (size_t i = 0; i < list.size(); ++i)
-    if (list[i].code == code) return static_cast<int>(i);
-  return 0;
 }
 
 // 提前量回填到输入框时使用可再次解析的写法
@@ -178,18 +172,18 @@ void EventDialog::Submit() {
 
 // ---------------------------------------------------------------- TaskDialog
 
-TaskDialog::TaskDialog(AppState& s) : s_(s), country_names_(CountryNames()) {
+TaskDialog::TaskDialog(AppState& s) : s_(s), config_names_(HolidayConfigNames()) {
   auto name = Input(&name_, Tr("Required"), Field(&name_));
   auto total = Input(&total_, Tr("e.g. 40 or 12:30"), Field(&total_));
   auto due = Input(&due_, "YYYY-MM-DD", Field(&due_));
   Components day_boxes = WeekdayBoxes(weekdays_);
   auto days = Container::Horizontal(day_boxes);
   auto skip = Checkbox(Tr("Skip holidays"), &skip_holiday_);
-  auto country = Toggle(&country_names_, &country_index_);
+  auto config = Toggle(&config_names_, &config_index_);
   auto ok = Button(Tr("OK"), [this] { Submit(); }, SmallButton());
   auto cancel = Button(Tr("Cancel"), [this] { Close(); }, SmallButton());
   auto controls =
-      Container::Vertical({name, total, due, days, skip, country, Container::Horizontal({ok, cancel})});
+      Container::Vertical({name, total, due, days, skip, config, Container::Horizontal({ok, cancel})});
 
   Build(Tr("Long-term task"), controls, [=, this] {
     Elements day_elems;
@@ -203,13 +197,13 @@ TaskDialog::TaskDialog(AppState& s) : s_(s), country_names_(CountryNames()) {
                FormRow(Tr("Due date"), InputBox(due, 12)),
                FormRow(Tr("Workdays"), hbox(std::move(day_elems))),
                FormRow("", skip->Render()),
-               FormRow(Tr("Holiday country"), country->Render()),
+               FormRow(Tr("Holiday config"), config->Render()),
                ErrorLine(),
                separatorLight(),
                Buttons(ok, cancel),
            }) |
            size(WIDTH, EQUAL, 64);
-  }, {name, total, due, days, skip, country, ok, cancel});
+  }, {name, total, due, days, skip, config, ok, cancel});
 }
 
 void TaskDialog::OpenCreate() {
@@ -219,7 +213,7 @@ void TaskDialog::OpenCreate() {
   due_ = FormatDate(AddDays(s_.today(), 14));
   weekdays_ = {true, true, true, true, true, false, false};
   skip_holiday_ = true;
-  country_index_ = CountryIndex(s_.display_country());
+  config_index_ = s_.display_config() - 1;
   Show();
 }
 
@@ -233,7 +227,7 @@ void TaskDialog::OpenModify(const std::string& id) {
   due_ = FormatDate(spec.due);
   weekdays_ = spec.weekdays;
   skip_holiday_ = spec.skip_holiday;
-  country_index_ = CountryIndex(spec.country);
+  config_index_ = spec.holiday_config - 1;
   Show();
 }
 
@@ -254,7 +248,7 @@ void TaskDialog::Submit() {
   spec.due = *due;
   spec.weekdays = weekdays_;
   spec.skip_holiday = skip_holiday_;
-  spec.country = SupportedCountries()[static_cast<size_t>(country_index_)].code;
+  spec.holiday_config = config_index_ + 1;
 
   const Result r = task_id_.empty() ? s_.CreateTask(spec) : s_.ModifyTask(task_id_, spec);
   if (!r) {
@@ -416,6 +410,40 @@ void ProgressDialog::Submit() {
   Close();
 }
 
+// ---------------------------------------------------------------- SloganDialog
+
+SloganDialog::SloganDialog(AppState& s) : s_(s) {
+  auto slogan = Input(&slogan_, kDefaultSlogan, Field(&slogan_, [this] { Submit(); }));
+  auto ok = Button(Tr("OK"), [this] { Submit(); }, SmallButton());
+  auto cancel = Button(Tr("Cancel"), [this] { Close(); }, SmallButton());
+  auto controls = Container::Vertical({slogan, Container::Horizontal({ok, cancel})});
+
+  Build(Tr("Slogan"), controls, [=, this] {
+    return vbox({
+               FormRow(Tr("Slogan"), InputBox(slogan, 40)),
+               text(Tr("   Shown in the status bar when there is no other message")) | dim,
+               text(Tr("   Leave empty to restore the default")) | dim,
+               ErrorLine(),
+               separatorLight(),
+               Buttons(ok, cancel),
+           }) |
+           size(WIDTH, EQUAL, 60);
+  }, {slogan, ok, cancel});
+}
+
+void SloganDialog::Open() {
+  slogan_ = s_.slogan();
+  Show();
+}
+
+void SloganDialog::Submit() {
+  if (const Result r = s_.SetSlogan(slogan_); !r) {
+    error_ = r.error();
+    return;
+  }
+  Close();
+}
+
 // ---------------------------------------------------------------- AboutDialog
 
 AboutDialog::AboutDialog() {
@@ -437,54 +465,60 @@ AboutDialog::AboutDialog() {
 
 // ---------------------------------------------------------------- HolidayDialog
 
-HolidayDialog::HolidayDialog(AppState& s) : s_(s), country_names_(CountryNames()) {
-  auto country = Toggle(&country_names_, &country_index_);
+HolidayDialog::HolidayDialog(AppState& s) : s_(s), config_names_(HolidayConfigNames()) {
+  auto config = Toggle(&config_names_, &config_index_);
+  auto country = Input(&country_, Tr("e.g. China"), Field(&country_));
   auto year = Input(&year_, "YYYY", Field(&year_));
   auto gen = Button(Tr("Generate & copy prompt"), [this] { MakePrompt(); }, SmallButton());
   auto path = Input(&path_, Tr("Path of the file holding the AI's JSON"), Field(&path_, [this] { Import(); }));
   auto import_btn = Button(Tr("Import"), [this] { Import(); }, SmallButton());
   auto close = Button(Tr("Close"), [this] { Close(); }, SmallButton());
-  auto controls = Container::Vertical({country, year, gen, path, Container::Horizontal({import_btn, close})});
+  auto controls = Container::Vertical({config, country, year, gen, path, Container::Horizontal({import_btn, close})});
 
   Build(Tr("Import holidays"), controls, [=, this] {
     Elements prompt_lines;
     std::istringstream ss(prompt_);
     for (std::string line; std::getline(ss, line);) prompt_lines.push_back(text(line));
 
-    std::string loaded;
-    for (const auto& [code, y] : s_.holidays().Loaded())
-      loaded += (loaded.empty() ? "" : "  ") + code + " " + std::to_string(y);
+    // 已导入的节假日：每个配置一行，列出已导入的年份
+    std::array<std::string, kHolidayConfigCount> years;
+    for (const auto& [config, y] : s_.holidays().Loaded())
+      years[static_cast<size_t>(config - 1)] += (years[static_cast<size_t>(config - 1)].empty() ? "" : "  ") + std::to_string(y);
+    Elements imported;
+    for (int config = 1; config <= kHolidayConfigCount; ++config) {
+      const std::string& list = years[static_cast<size_t>(config - 1)];
+      imported.push_back(hbox({text(HolidayConfigShortName(config)) | size(WIDTH, EQUAL, 12),
+                               list.empty() ? text(Tr("none")) | dim : text(list)}));
+    }
 
     Elements body = {
-        text(Tr("Imported: {list}", {{"list", loaded.empty() ? Tr("none") : loaded}})) | dim,
-        separatorLight(),
-        FormRow(Tr("Country"), country->Render()),
+        window(text(" " + Tr("Imported holidays") + " "), vbox(std::move(imported))),
+        FormRow(Tr("Holiday config"), config->Render()),
+        FormRow(Tr("Country"), InputBox(country, 20)),
+        text(Tr("   The country is used in the prompt and shown in the sidebar")) | dim,
         FormRow(Tr("Year"), InputBox(year, 8)),
         FormRow(Tr("① Prompt"), gen->Render()),
     };
     if (!prompt_lines.empty())
       body.push_back(vbox(std::move(prompt_lines)) | dim | yframe | size(HEIGHT, LESS_THAN, 12) | border);
     body.push_back(FormRow(Tr("② File path"), InputBox(path, 48)));
-    body.push_back(text(Tr("   Existing data for the same country and year will be replaced")) | dim);
+    body.push_back(text(Tr("   Existing data for the same holiday config and year will be replaced")) | dim);
     if (!info_.empty()) body.push_back(WrapText(info_) | color(Color::Green));
     body.push_back(ErrorLine());
     body.push_back(separatorLight());
     body.push_back(Buttons(import_btn, close));
     return vbox(std::move(body)) | size(WIDTH, EQUAL, 72);
-  }, {country, year, gen, path, import_btn, close});
+  }, {config, country, year, gen, path, import_btn, close});
 }
 
 void HolidayDialog::Open() {
-  country_index_ = CountryIndex(s_.display_country());
+  config_index_ = s_.display_config() - 1;
+  country_ = s_.holidays().LatestCountry(Config());  // 默认沿用该配置已有数据的国家
   year_ = std::to_string(YearNum(s_.selected()));
   path_.clear();
   prompt_.clear();
   info_.clear();
   Show();
-}
-
-std::string HolidayDialog::Country() const {
-  return SupportedCountries()[static_cast<size_t>(country_index_)].code;
 }
 
 std::optional<int> HolidayDialog::ParsedYear() {
@@ -502,7 +536,13 @@ std::optional<int> HolidayDialog::ParsedYear() {
 void HolidayDialog::MakePrompt() {
   const auto year = ParsedYear();
   if (!year) return;
-  prompt_ = HolidayPrompt(Country(), *year);
+  const std::string country(Trim(country_));
+  if (country.empty()) {
+    error_ = Tr("Please enter a country");
+    info_.clear();
+    return;
+  }
+  prompt_ = HolidayPrompt(country, Config(), *year);
   error_.clear();
   info_ = CopyToClipboard(prompt_) ? Tr("Prompt copied to the clipboard; paste it to an AI")
                                    : Tr("Copy to clipboard failed; please copy the prompt below manually");
@@ -519,14 +559,14 @@ void HolidayDialog::Import() {
     info_.clear();
     return;
   }
-  const Result r = s_.ImportHolidays(PathFromUtf8(p), Country(), *year);
+  const Result r = s_.ImportHolidays(PathFromUtf8(p), Config(), *year);
   if (!r) {
     error_ = r.error();
     info_.clear();
     return;
   }
   error_.clear();
-  info_ = Tr("Imported {country} holidays for {year}", {{"country", CountryName(Country())}, {"year", std::to_string(*year)}});
+  info_ = Tr("Imported {config} for {year}", {{"config", HolidayConfigName(Config())}, {"year", std::to_string(*year)}});
   s_.Info(info_);
 }
 

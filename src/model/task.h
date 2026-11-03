@@ -32,7 +32,7 @@ struct TaskSpec {
   Date due{};                      // 预定完成日期
   std::array<bool, 7> weekdays{};  // [0]=周一 … [6]=周日
   bool skip_holiday = true;
-  std::string country = "CN";  // 跳过节假日时依据的国家
+  int holiday_config = 1;      // 跳过节假日时依据的节假日配置（1..kHolidayConfigCount）
 
   bool operator==(const TaskSpec&) const = default;
 };
@@ -87,9 +87,9 @@ TaskPlan ComputePlan(const TaskState& state, Date today, const HolidayCalendar& 
 // 某天的侧边栏是否显示该任务
 bool ShowsOn(const TaskState& state, Date d, Date today);
 
-// 创建/修改时的校验，返回错误信息
-std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today,
-                                        const HolidayCalendar& holidays);
+// 创建/修改时的校验，返回错误信息。
+// 不要求截止日期之前的各年都已导入节假日：没有数据的年份按没有节假日计算，导入或刷新后自动重算
+std::optional<std::string> ValidateSpec(const TaskSpec& spec, Date today);
 
 // 日志条目 → 可读文字，如 "修改：截止日期 → 2027-01-10"
 std::string DescribeLogEntry(const Json& entry);

@@ -16,3 +16,7 @@ data/
 
 # 写文件时的临时文件
 *.tmp
+
+# 发布版构建与打包结果（./build.sh package）
+build-release/
+dist/

@@ -73,11 +73,11 @@ class MonthViewBase : public ComponentBase {
     static constexpr std::array<const char*, 12> kMonths = {
         N_("January"), N_("February"), N_("March"),     N_("April"),   N_("May"),      N_("June"),
         N_("July"),    N_("August"),   N_("September"), N_("October"), N_("November"), N_("December")};
-    const std::string title = Tr("{month_name} {year}    Holiday config {n}",
+    const std::string title = Tr("{month_name} {year}    {config}",
                                  {{"month_name", Tr(kMonths[MonthNum(sel) - 1])},
                                   {"year", std::to_string(YearNum(sel))},
                                   {"month", std::to_string(MonthNum(sel))},
-                                  {"n", std::to_string(HolidayConfigNumber(s_.display_country()))}});
+                                  {"config", HolidayConfigName(s_.display_config())}});
     return Panel(title, vbox(std::move(rows)), Focused());
   }
 
@@ -88,7 +88,7 @@ class MonthViewBase : public ComponentBase {
 
   Element Cell(Date d) {
     const Date today = s_.today();
-    const HolidayDay* holiday = s_.holidays().Find(s_.display_country(), d);
+    const HolidayDay* holiday = s_.holidays().Find(s_.display_config(), d);
     const bool weekend = IsoWeekday(d) >= 6;
 
     // 第 1 行：日期 + 休/班标记
@@ -99,11 +99,11 @@ class MonthViewBase : public ComponentBase {
     if (holiday) mark = holiday->off ? text(Tr("Off")) | color(Color::Red) : text(Tr("Work")) | color(Color::Blue);
     auto line1 = hbox({num, filler(), mark});
 
-    // 第 2 行：节假日名 > 农历节日 > 节气 > 农历日
+    // 第 2 行：节假日名 > 农历节日 > 节气 > 农历日（关闭农历时只显示节假日名）
     Element line2;
     if (holiday) {
       line2 = text(holiday->name) | color(holiday->off ? Color::Red : Color::Blue);
-    } else if (const auto ld = ToLunar(d)) {
+    } else if (const auto ld = s_.show_lunar() ? ToLunar(d) : std::nullopt) {
       if (auto f = LunarFestival(*ld); !f.empty()) line2 = text(f) | color(Color::Yellow);
       else if (auto t = SolarTerm(d); !t.empty()) line2 = text(t) | color(Color::Green);
       else line2 = text(ld->day == 1 ? LunarMonthName(*ld) : LunarDayName(ld->day)) | dim;

@@ -1,4 +1,4 @@
-# LookForwardCalendar (LFCalendar) v1.4.0
+# LookForwardCalendar (LFCalendar) v1.5.0
 
 English | [中文](README_CN.md)
 
@@ -18,6 +18,22 @@ LookForwardCalendar (LFCalendar for short) is a terminal calendar for Windows bu
 - **Task overview and reminder list**: full-screen subscreens
 - **Multiple languages**: all UI text comes from language files in `language/`; English by default, Chinese included, press `g` to switch
 
+## Quick start (release package)
+
+Download `LookForward-v<version>-win64.zip`, unzip it anywhere and double-click `LookForward.exe` (or run it from Windows Terminal / PowerShell / cmd). Nothing needs to be installed.
+
+```
+LookForward-v1.5.0-win64/
+  LookForward.exe        the program (statically linked, no DLLs needed)
+  language/              language files: EN.json (default), CN.json; must stay next to the exe
+  README.md, README_CN.md
+  docs/logo.png          the image used in the READMEs
+```
+
+- On first use a `data/` folder is created next to the exe for your events, tasks, holidays and settings. To upgrade, unzip the new version and copy your old `data/` folder next to the new exe.
+- The UI starts in English; press `g` to switch to Chinese.
+- Use a window at least 120 columns wide.
+
 ## Building and running
 
 Requirements: GCC 13 or later (C++23), CMake 3.20 or later, Ninja, Git, and a network connection for the first build (to download FTXUI and nlohmann/json).
@@ -26,9 +42,10 @@ Requirements: GCC 13 or later (C++23), CMake 3.20 or later, Ninja, Git, and a ne
 ./build.sh          # configure + build + run unit tests
 ./build.sh run      # same, then start the program in a new console window
 ./build.sh clean    # delete build/ and rebuild
+./build.sh package  # release build in build-release/, packed into dist/LookForward-v<version>-win64.zip
 ```
 
-The result is `build/LookForward.exe`; the language files are copied to `build/language/` at the same time. When distributing, keep the `language/` folder next to the exe.
+The result is `build/LookForward.exe`; the language files are copied to `build/language/` at the same time. When distributing, keep the `language/` folder next to the exe; `./build.sh package` produces a ready-to-use zip with the release build (no debug symbols, about 3 MB) laid out as shown in Quick start.
 
 - Run it in **Windows Terminal, PowerShell or cmd**. The Git Bash terminal does not deliver key presses correctly, so `./build.sh run` opens a separate window.
 - A window at least **120 columns** wide is recommended.
@@ -70,6 +87,8 @@ Only keys found on every keyboard are used.
 |               | `i`                     | import holidays                                                                                  |
 |               | `c`                     | switch the holidays shown on the calendar between holiday config 1 and 2; saved automatically    |
 |               | `g`                     | switch the UI language to the next file in`language/` (e.g. CN → EN → CN); saved automatically |
+|               | `u`                     | show / hide the lunar calendar; saved automatically (see below)                                  |
+|               | `e`                     | edit the slogan shown in the status bar (see below)                                              |
 |               | `r`                     | refresh (re-read the data files)                                                                 |
 |               | `v`                     | version information                                                                              |
 |               | `q`                     | quit                                                                                             |
@@ -130,7 +149,7 @@ Press `n` to create a task:
 | Due date        | `YYYY-MM-DD`                                |
 | Workdays        | which days of the week you work on it       |
 | Skip holidays   | when ticked, no work is planned on days off |
-| Holiday country | the country whose holidays are skipped      |
+| Holiday config  | whose holidays are skipped (config 1 / 2)   |
 
 Each task gets a random ID (e.g. `ID:a3f9`). In the sidebar the first line of a task is its name and the second its ID and status, with a blank line between tasks. When the content is taller than the screen a scrollbar appears on the right; scroll with the arrow keys or the mouse wheel. In the task overview, `Enter` shows the task's full log and `d` deletes the task (its file is deleted and cannot be recovered).
 
@@ -152,17 +171,27 @@ Each task gets a random ID (e.g. `ID:a3f9`). In the sidebar the first line of a 
 | `[Modify]`             | change the hours, due date, workdays and so on; the plan is recalculated                       |
 | `[Abort]` / `[Done]`   | end the task                                                                                   |
 
-When you create or modify a task that skips holidays, and holiday data for some year between today and the due date has not been imported, the operation is cancelled and you are asked to import it first.
+A task that skips holidays may run into a year whose holidays have not been imported yet; days in that year are planned as ordinary workdays. After you import that year (`i`) or refresh (`r`), the holidays are read again and every plan is recalculated.
 
 ## Importing holidays
 
-1. Press `i`, choose the country and year, and press "Generate & copy prompt"; the prompt is copied to the clipboard.
-2. Paste the prompt to any AI (such as Claude). It returns the JSON in a code block; an AI that can create files also gives you `<country>_<year>.json` to download. Otherwise save the code block to a file (keeping the text around the code block is fine).
+1. Press `i`, choose the holiday config (1 / 2), enter the country and the year, and press "Generate & copy prompt"; the prompt is copied to the clipboard.
+2. Paste the prompt to any AI (such as Claude). It returns the JSON in a code block; an AI that can create files also gives you `config<N>_<year>.json` to download. Otherwise save the code block to a file (keeping the text around the code block is fine).
 3. Enter the file's path under "File path" (a quoted path works too) and press "Import".
 
-The program checks the format and that the country and year match your choice, then saves the data to `data/holidays/<country>_<year>.json`, replacing any existing data for the same country and year.
+The program checks the format and that the year matches your choice, then saves the data to `data/holidays/config<N>_<year>.json`, replacing any existing data for the same holiday config and year.
+
+Holiday configs 1 and 2 are slots that are not tied to any country: you can import the holidays of any country into either one. The country is just a property of the config (the `country` field of the JSON, taken from what you entered for the prompt). It is used only by the prompt and by the sidebar, which shows a day's holidays as "country: holiday", e.g. "中国: 国庆节 (off)". When the dialog opens, the country field is filled with the country already stored for that config.
 
 The prompt follows the UI language: English with EN, Chinese with CN.
+
+## Lunar calendar on/off
+
+`u` shows or hides the lunar calendar: lunar dates, lunar festivals and solar terms. When hidden, calendar cells show only holiday names on the second line, and the sidebar shows the slogan (see below) where the lunar date was. The setting is saved in `data/preference.json`; the lunar calendar is shown by default.
+
+## Slogan
+
+When there is no other message, the status bar shows a slogan, "Look Forward!" by default. Press `e` to change it; leave it empty to restore the default. The slogan is saved in `data/preference.json` and is not translated.
 
 ## Languages
 
@@ -187,8 +216,8 @@ data/
   general/<year>/<month>.json    events of each day, e.g. general/2026/11.json
   task/<created>_<ID>.json       one file per task, containing its operation log
   fixed/<created>_<ID>.json      one file per fixed schedule
-  preference.json                settings: current country and language (language file name, e.g. "CN"), read at startup
-  holidays/<country>_<year>.json imported holidays, e.g. holidays/CN_2027.json
+  preference.json                settings: holiday config shown on the calendar (1 / 2), language (language file name, e.g. "CN") whether the lunar calendar is shown, and the slogan; read at startup
+  holidays/config<N>_<year>.json imported holidays of a holiday config, e.g. holidays/config1_2027.json
 ```
 
 A task file records every operation as a log: create, modify, progress, pause, resume, complete, abort, each with its time.
@@ -204,4 +233,4 @@ The language files are in `language/` next to the exe (not in `data/`): `EN.json
 
 ## About
 
-v1.4.0 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).
+v1.5.0 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).

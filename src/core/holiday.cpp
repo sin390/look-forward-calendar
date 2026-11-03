@@ -25,9 +25,9 @@ void ReplaceAll(std::string& s, std::string_view from, std::string_view to) {
     s.replace(pos, from.size(), to);
 }
 
-constexpr const char* kPromptTemplate = N_(R"PROMPT(List all statutory public holidays of {COUNTRY_NAME} for the year {YEAR}, strictly in the JSON format below.
+constexpr const char* kPromptTemplate = N_(R"PROMPT(List all statutory public holidays of {COUNTRY} for the year {YEAR}, strictly in the JSON format below.
 Put the complete JSON in a single ```json code block, and output nothing outside the code block.
-If you can create files, also create a downloadable file named {COUNTRY}_{YEAR}.json with exactly the same JSON as the code block.
+If you can create files, also create a downloadable file named config{CONFIG}_{YEAR}.json with exactly the same JSON as the code block.
 
 {
   "country": "{COUNTRY}",
@@ -47,27 +47,13 @@ Rules:
 
 }  // namespace
 
-const std::vector<Country>& SupportedCountries() {
-  static const std::vector<Country> kCountries = {{"CN", N_("China")}, {"JP", N_("Japan")}};
-  return kCountries;
-}
+bool IsHolidayConfig(int config) { return config >= 1 && config <= kHolidayConfigCount; }
 
-std::string CountryName(std::string_view code) {
-  for (const Country& c : SupportedCountries())
-    if (c.code == code) return Tr(c.name);
-  return std::string(code);
-}
+std::string HolidayConfigName(int config) { return Tr("Holiday config {n}", {{"n", std::to_string(config)}}); }
 
-int HolidayConfigNumber(std::string_view code) {
-  const auto& list = SupportedCountries();
-  for (size_t i = 0; i < list.size(); ++i)
-    if (list[i].code == code) return static_cast<int>(i) + 1;
-  return 1;
-}
+std::string HolidayConfigShortName(int config) { return Tr("Config {n}", {{"n", std::to_string(config)}}); }
 
-std::expected<HolidayYear, std::string> ParseHolidayYear(std::string_view text,
-                                                         std::string_view expect_country,
-                                                         int expect_year) {
+std::expected<HolidayYear, std::string> ParseHolidayYear(std::string_view text, int expect_year) {
   const Json j = Json::parse(StripCodeFence(text), nullptr, /*allow_exceptions=*/false);
   if (j.is_discarded()) return std::unexpected(Tr("not valid JSON"));
   if (!j.is_object()) return std::unexpected(Tr("top level must be an object { ... }"));
@@ -82,9 +68,6 @@ std::expected<HolidayYear, std::string> ParseHolidayYear(std::string_view text,
   hy.country = j["country"].get<std::string>();
   hy.year = j["year"].get<int>();
 
-  if (!expect_country.empty() && hy.country != expect_country)
-    return std::unexpected(Tr("country is {country}, which does not match the selected {expected}",
-                              {{"country", hy.country}, {"expected", std::string(expect_country)}}));
   if (expect_year != 0 && hy.year != expect_year)
     return std::unexpected(Tr("year is {year}, which does not match the selected {expected}",
                               {{"year", std::to_string(hy.year)}, {"expected", std::to_string(expect_year)}}));
@@ -120,38 +103,49 @@ Json ToJson(const HolidayYear& hy) {
   return {{"country", hy.country}, {"year", hy.year}, {"days", std::move(days)}};
 }
 
-std::string HolidayPrompt(std::string_view country, int year) {
+std::string HolidayPrompt(std::string_view country, int config, int year) {
   std::string s = Tr(kPromptTemplate);
-  ReplaceAll(s, "{COUNTRY_NAME}", CountryName(country));
   ReplaceAll(s, "{COUNTRY}", country);
+  ReplaceAll(s, "{CONFIG}", std::to_string(config));
   ReplaceAll(s, "{YEAR}", std::to_string(year));
   return s;
 }
 
 void HolidayCalendar::Set(HolidayYear hy) {
-  auto& days = years_[{hy.country, hy.year}];
-  days.clear();
-  for (HolidayDay& d : hy.days) days.emplace(d.date, std::move(d));
+  Entry& e = years_[{hy.config, hy.year}];
+  e.country = std::move(hy.country);
+  e.days.clear();
+  for (HolidayDay& d : hy.days) e.days.emplace(d.date, std::move(d));
 }
 
-const HolidayDay* HolidayCalendar::Find(std::string_view country, Date d) const {
-  const auto y = years_.find({std::string(country), YearNum(d)});
+const HolidayDay* HolidayCalendar::Find(int config, Date d) const {
+  const auto y = years_.find({config, YearNum(d)});
   if (y == years_.end()) return nullptr;
-  const auto it = y->second.find(d);
-  return it == y->second.end() ? nullptr : &it->second;
+  const auto it = y->second.days.find(d);
+  return it == y->second.days.end() ? nullptr : &it->second;
 }
 
-bool HolidayCalendar::IsOff(std::string_view country, Date d) const {
-  const HolidayDay* h = Find(country, d);
+bool HolidayCalendar::IsOff(int config, Date d) const {
+  const HolidayDay* h = Find(config, d);
   return h && h->off;
 }
 
-bool HolidayCalendar::Has(std::string_view country, int year) const {
-  return years_.contains({std::string(country), year});
+bool HolidayCalendar::Has(int config, int year) const { return years_.contains({config, year}); }
+
+std::string HolidayCalendar::Country(int config, int year) const {
+  const auto it = years_.find({config, year});
+  return it == years_.end() ? std::string() : it->second.country;
 }
 
-std::vector<std::pair<std::string, int>> HolidayCalendar::Loaded() const {
-  std::vector<std::pair<std::string, int>> out;
+std::string HolidayCalendar::LatestCountry(int config) const {
+  std::string country;
+  for (const auto& [key, e] : years_)  // 按 (配置, 年) 升序，最后一个即最近一年
+    if (key.first == config) country = e.country;
+  return country;
+}
+
+std::vector<std::pair<int, int>> HolidayCalendar::Loaded() const {
+  std::vector<std::pair<int, int>> out;
   for (const auto& [key, _] : years_) out.push_back(key);
   return out;
 }

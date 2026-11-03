@@ -26,7 +26,7 @@ Color StatusColor(const TaskEntry& e) {
 }
 
 // 表格列宽（名称列自适应）
-constexpr int kStatusW = 12, kGaugeW = 22, kDoneW = 15, kDateW = 12, kWeekW = 24, kTodayW = 8;
+constexpr int kStatusW = 12, kGaugeW = 22, kDoneW = 15, kDateW = 12, kWeekW = 34, kTodayW = 8;
 
 Element Cell(Element e, int width) { return std::move(e) | size(WIDTH, EQUAL, width); }
 
@@ -69,7 +69,7 @@ Element TaskRow(const TaskEntry& e, Date today, const HolidayCalendar& holidays)
       Cell(text(FormatMinutes(done) + " / " + FormatMinutes(spec.total_minutes)), kDoneW),
       Cell(text(FormatDate(e.state.created)), kDateW),
       Cell(text(FormatDate(spec.due)), kDateW),
-      Cell(text(WeekdaysText(spec.weekdays) + (spec.skip_holiday ? Tr(" skip {country}", {{"country", spec.country}}) : "")), kWeekW),
+      Cell(text(WeekdaysText(spec.weekdays) + (spec.skip_holiday ? Tr(" skip {config}", {{"config", HolidayConfigShortName(spec.holiday_config)}}) : "")), kWeekW),
       Cell(text(today_text) | color(Color::Cyan), kTodayW),
   });
 }

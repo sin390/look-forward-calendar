@@ -1,4 +1,4 @@
-# LookForwardCalendar（LFCalendar）v1.4.0
+# LookForwardCalendar（LFCalendar）v1.5.0
 
 [English](README.md) | 中文
 
@@ -18,6 +18,22 @@ LookForwardCalendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/A
 - **任务总览、提醒列表**：整屏子界面
 - **多语言**：界面文字来自 `language/` 下的语言文件，默认英文，自带中文，按 `g` 切换
 
+## 快速开始（发布包）
+
+下载 `LookForward-v<版本>-win64.zip`，解压到任意位置，双击 `LookForward.exe`（或在 Windows Terminal / PowerShell / cmd 中运行）即可，不需要安装。
+
+```
+LookForward-v1.5.0-win64/
+  LookForward.exe        程序本体（静态链接，不需要 DLL）
+  language/              语言文件：EN.json（默认）、CN.json，必须和 exe 放在一起
+  README.md、README_CN.md
+  docs/logo.png          README 中的图片
+```
+
+- 首次使用时会在 exe 旁边自动生成 `data/` 目录，保存事件、任务、节假日和配置。升级时解压新版本，把旧的 `data/` 目录复制到新 exe 旁边即可。
+- 界面默认为英文，按 `g` 切换为中文。
+- 建议窗口宽度在 120 列以上。
+
 ## 编译与运行
 
 需要：GCC 13 及以上（支持 C++23）、CMake 3.20 及以上、Ninja、Git，以及首次编译时的网络连接（用于下载 FTXUI 和 nlohmann/json）。
@@ -26,9 +42,10 @@ LookForwardCalendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/A
 ./build.sh          # 配置 + 编译 + 运行单元测试
 ./build.sh run      # 同上，然后在新的控制台窗口中启动程序
 ./build.sh clean    # 删除 build/ 后重新编译
+./build.sh package  # 编译发布版（build-release/），打包为 dist/LookForward-v<版本>-win64.zip
 ```
 
-编译结果为 `build/LookForward.exe`，语言文件会同时复制到 `build/language/`。发布时请把 `language/` 目录和 exe 放在一起。
+编译结果为 `build/LookForward.exe`，语言文件会同时复制到 `build/language/`。发布时请把 `language/` 目录和 exe 放在一起；`./build.sh package` 会用发布版（去掉调试符号，约 3 MB）按“快速开始”中的结构生成开箱即用的 zip。
 
 - 请在 **Windows Terminal、PowerShell 或 cmd** 中运行。Git Bash 的终端无法正常接收按键，所以 `./build.sh run` 会另外打开一个窗口。
 - 建议窗口宽度在 **120 列以上**。
@@ -69,6 +86,8 @@ LookForwardCalendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/A
 | | `i` | 导入节假日 |
 | | `c` | 在节假日配置1 / 节假日配置2 之间切换月历上显示的节假日，自动保存 |
 | | `g` | 按 `language/` 下的语言文件切换界面语言（如 CN → EN → CN），自动保存 |
+| | `u` | 开关农历显示，自动保存（见下文） |
+| | `e` | 修改状态栏显示的标语（见下文） |
 | | `r` | 刷新（重新读取数据文件） |
 | | `v` | 版本信息 |
 | | `q` | 退出 |
@@ -127,7 +146,7 @@ LookForwardCalendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/A
 | 完成日期 | `YYYY-MM-DD` |
 | 每周工作 | 勾选每周哪几天工作 |
 | 跳过节假日 | 勾选后，放假日不分配工作量 |
-| 节假日国家 | 跳过节假日时依据的国家 |
+| 节假日配置 | 跳过哪个配置的节假日（配置1 / 2） |
 
 每个任务有一个随机生成的 ID（如 `ID:a3f9`），侧边栏中每个任务的第一行是任务名，第二行是 ID 和任务状态，任务之间空一行。内容超出一屏时右侧出现滚动条，用方向键或鼠标滚轮滚动。在任务总览中按 `Enter` 可以查看任务的全部日志，按 `d` 可以删除任务（会删除任务文件，无法恢复）。
 
@@ -148,17 +167,27 @@ LookForwardCalendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/A
 | `[修改]` | 修改时长、截止日期、工作日等，后续安排自动重新计算 |
 | `[中止]` / `[完成]` | 结束任务 |
 
-新建或修改跳过节假日的任务时，如果从今天到截止日期之间有年份还没有导入节假日数据，会取消这次操作，并提示先导入。
+跳过节假日的任务可以跨入还没有导入节假日的年份，这些年份的日期按普通工作日安排。导入该年的节假日（`i`）或刷新（`r`）后，会重新读取节假日并重新计算所有安排。
 
 ## 导入节假日
 
-1. 按 `i`，选择国家和年份，按「生成并复制提示词」，提示词会自动复制到剪贴板。
-2. 把提示词粘贴给任意 AI（如 Claude）。AI 会把 JSON 放在代码块中返回；能生成文件的 AI 还会同时给出 `<国家>_<年>.json`，直接下载即可，否则把代码块内容保存成文件（连同代码块前后的文字一起保存也没关系）。
+1. 按 `i`，选择节假日配置（1 / 2），填写国家和年份，按「生成并复制提示词」，提示词会自动复制到剪贴板。
+2. 把提示词粘贴给任意 AI（如 Claude）。AI 会把 JSON 放在代码块中返回；能生成文件的 AI 还会同时给出 `config<配置>_<年>.json`，直接下载即可，否则把代码块内容保存成文件（连同代码块前后的文字一起保存也没关系）。
 3. 在「文件路径」中填入这个文件的路径（带引号的路径也可以），按「导入」。
 
-程序会检查格式，以及国家、年份是否和所选的一致。检查通过后保存到 `data/holidays/<国家>_<年>.json`；同一国家同一年份的旧数据会被整体覆盖。
+程序会检查格式，以及年份是否和所选的一致。检查通过后保存到 `data/holidays/config<配置>_<年>.json`；同一节假日配置同一年份的旧数据会被整体覆盖。
+
+节假日配置1、2 是两个不与国家绑定的槽位，任何国家的节假日都可以导入到任一配置中。国家只是配置的一个属性（JSON 的 `country` 字段，来自生成提示词时填写的国家），只用于提示词和侧边栏：侧边栏按“国家：假日”的格式显示当天的节日，如“中国：国庆节（休）”。打开对话框时，国家一栏会自动填入该配置已有数据的国家。
 
 提示词的语言跟随界面语言：EN 时为英文，CN 时为中文。
+
+## 农历开关
+
+按 `u` 开关农历显示：农历日期、农历节日和节气。关闭时月历格子第二行只显示节假日名，侧边栏原来农历的位置显示标语（见下文）。设置保存在 `data/preference.json` 中，默认显示农历。
+
+## 标语
+
+没有其他消息时，状态栏显示一句标语，默认为“Look Forward!”。按 `e` 修改，留空则恢复默认。标语保存在 `data/preference.json` 中，不随界面语言翻译。
 
 ## 多语言
 
@@ -183,8 +212,8 @@ data/
   general/<年>/<月>.json        每天的事件，如 general/2026/11.json
   task/<创建日期>_<ID>.json     每个任务一个文件，内容是操作日志
   fixed/<创建日期>_<ID>.json    每个固定日程一个文件
-  preference.json               配置：当前的国家和语言（语言文件名，如 "CN"），启动时读取
-  holidays/<国家>_<年>.json     导入的节假日，如 holidays/CN_2027.json
+  preference.json               配置：月历显示的节假日配置（1 / 2）、语言（语言文件名，如 "CN"）、是否显示农历、标语，启动时读取
+  holidays/config<配置>_<年>.json  各节假日配置导入的节假日，如 holidays/config1_2027.json
 ```
 
 任务文件按日志方式记录每一次操作：创建、修改、进行、暂停、恢复、完成、中止，以及每次操作的时间。
@@ -200,4 +229,4 @@ data/
 
 ## 关于
 
-v1.4.0（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。
+v1.5.0（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。

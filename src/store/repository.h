@@ -17,7 +17,7 @@ namespace cal {
 //   general/<年>/<月>.json
 //   task/<创建日期>_<短id>.json
 //   fixed/<创建日期>_<短id>.json
-//   holidays/<国家>_<年>.json
+//   holidays/config<配置>_<年>.json
 //   preference.json
 class Repository {
  public:
@@ -42,11 +42,14 @@ class Repository {
   Preference LoadPreference(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SavePreference(const Preference& p) const;
 
+  // v1.5.0 之前的 <国家代码>_<年>.json（CN → 配置1，JP → 配置2）在读取时自动改名为新格式
   HolidayCalendar LoadHolidays(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SaveHolidayYear(const HolidayYear& hy) const;
 
  private:
   fs::path MonthPath(int year, unsigned month) const;
+  fs::path HolidayPath(int config, int year) const;
+  void MigrateLegacyHolidays(std::vector<std::string>& warnings) const;
 
   fs::path root_;
 };

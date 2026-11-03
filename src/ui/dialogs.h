@@ -74,8 +74,8 @@ class TaskDialog : public Dialog {
   std::string name_, total_, due_;
   std::array<bool, 7> weekdays_{};
   bool skip_holiday_ = true;
-  int country_index_ = 0;
-  std::vector<std::string> country_names_;
+  int config_index_ = 0;  // 节假日配置，0 起
+  std::vector<std::string> config_names_;
 };
 
 // 新建固定日程：工作内容、时间段、重复方式（默认每周）、起止日期
@@ -109,6 +109,19 @@ class ProgressDialog : public Dialog {
   std::string minutes_, note_;
 };
 
+// 修改标语（没有其他消息时显示在状态栏）
+class SloganDialog : public Dialog {
+ public:
+  explicit SloganDialog(AppState& s);
+  void Open();
+
+ private:
+  void Submit();
+
+  AppState& s_;
+  std::string slogan_;
+};
+
 // 版本信息
 class AboutDialog : public Dialog {
  public:
@@ -116,22 +129,23 @@ class AboutDialog : public Dialog {
   void Open() { Show(); }
 };
 
-// 节假日导入：生成提示词并复制，输入文件路径后校验导入
+// 节假日导入：选择节假日配置、输入国家（只用于提示词和侧边栏显示）和年份，
+// 生成提示词并复制，输入文件路径后校验导入
 class HolidayDialog : public Dialog {
  public:
   explicit HolidayDialog(AppState& s);
   void Open();
 
  private:
-  std::string Country() const;
+  int Config() const { return config_index_ + 1; }
   std::optional<int> ParsedYear();
   void MakePrompt();
   void Import();
 
   AppState& s_;
-  int country_index_ = 0;
-  std::vector<std::string> country_names_;
-  std::string year_, path_, prompt_, info_;
+  int config_index_ = 0;  // 0 起
+  std::vector<std::string> config_names_;
+  std::string country_, year_, path_, prompt_, info_;
 };
 
 }  // namespace cal::ui

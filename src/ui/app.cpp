@@ -36,13 +36,14 @@ Element StatusBar(AppState& s, int view, int pane) {
   else if (pane == kMonthPane)
     hints = {Tr("Move      arrows/hjkl date   [ ] month   t today   Tab sidebar"),
              Tr("Actions   a event  f fixed schedule  n task  o overview  m reminders  r refresh  v version  q quit"),
-             Tr("Settings  c switch holidays  g language  i import holidays")};
+             Tr("Settings  c holiday config  i import holidays  g language  u lunar calendar  e slogan")};
   else
     hints = {Tr("arrows/hjkl select  Enter press button  Tab/Esc back to calendar")};
 
   Elements lines;
   for (const std::string& h : hints) lines.push_back(text(h) | dim);
-  auto msg = WrapText(s.message());
+  // 没有消息时显示标语
+  auto msg = s.message().empty() ? text(s.slogan()) | color(Color::Yellow) : WrapText(s.message());
   if (s.message_is_error()) msg |= color(Color::Red);
   Element reminder = text("");
   if (const size_t n = s.ActiveReminders(NowLocal()).size(); n > 0)
@@ -54,7 +55,7 @@ Element StatusBar(AppState& s, int view, int pane) {
 }  // namespace
 
 App::App(AppState& state, std::function<void()> on_quit)
-    : state_(state), event_dialog_(state), fixed_dialog_(state), task_dialog_(state), progress_dialog_(state), holiday_dialog_(state) {
+    : state_(state), event_dialog_(state), fixed_dialog_(state), task_dialog_(state), progress_dialog_(state), holiday_dialog_(state), slogan_dialog_(state) {
   auto month = MonthView(state_);
   auto day = DayPanel(state_, {
                                   .new_event = [this](Date d) { event_dialog_.OpenAdd(d); },
@@ -110,7 +111,9 @@ App::App(AppState& state, std::function<void()> on_quit)
     else if (e == Event::Character('f')) fixed_dialog_.Open(state_.selected());
     else if (e == Event::Character('n')) task_dialog_.OpenCreate();
     else if (e == Event::Character('i')) holiday_dialog_.Open();
-    else if (e == Event::Character('c')) state_.CycleDisplayCountry();
+    else if (e == Event::Character('c')) state_.CycleHolidayConfig();
+    else if (e == Event::Character('u')) state_.ToggleLunar();
+    else if (e == Event::Character('e')) slogan_dialog_.Open();
     else if (e == Event::Character('g')) {
       // 按钮、标签等文字在构造时生成，切换语言后退出事件循环，由 RunApp 重建界面
       if (state_.CycleLanguage()) {
@@ -131,6 +134,7 @@ App::App(AppState& state, std::function<void()> on_quit)
   root_ |= Modal(task_dialog_.component(), task_dialog_.shown());
   root_ |= Modal(progress_dialog_.component(), progress_dialog_.shown());
   root_ |= Modal(holiday_dialog_.component(), holiday_dialog_.shown());
+  root_ |= Modal(slogan_dialog_.component(), slogan_dialog_.shown());
   root_ |= Modal(about_dialog_.component(), about_dialog_.shown());
 }
 

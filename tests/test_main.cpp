@@ -12,6 +12,7 @@
 #include "model/preference.h"
 #include "model/task.h"
 #include "store/fs_util.h"
+#include "store/repository.h"
 
 using namespace cal;
 
@@ -80,22 +81,29 @@ void TestHoliday() {
   "days": [ { "date": "2026-10-01", "name": "国庆节", "off": true },
             { "date": "2026-10-10", "name": "国庆节调休补班", "off": false } ] }
 ```)";
-  auto hy = ParseHolidayYear(text, "CN", 2026);
+  auto hy = ParseHolidayYear(text, 2026);
   CHECK(hy.has_value());
-  CHECK(!ParseHolidayYear(text, "JP", 2026).has_value());
-  CHECK(!ParseHolidayYear(text, "CN", 2027).has_value());
+  CHECK(hy && hy->country == "CN");
+  CHECK(!ParseHolidayYear(text, 2027).has_value());
   CHECK(!ParseHolidayYear("{\"country\":\"CN\",\"year\":2026,\"days\":[{\"date\":\"2027-01-01\",\"name\":\"x\",\"off\":true}]}").has_value());
 
+  // 节假日配置不与国家绑定：同一份数据可以放在任一配置中
   HolidayCalendar cal;
+  hy->config = 2;
   cal.Set(*hy);
-  CHECK(cal.IsOff("CN", D("2026-10-01")));
-  CHECK(!cal.IsOff("CN", D("2026-10-10")));
-  CHECK(cal.Has("CN", 2026));
-  CHECK(!cal.Has("CN", 2027));
+  CHECK(cal.IsOff(2, D("2026-10-01")));
+  CHECK(!cal.IsOff(2, D("2026-10-10")));
+  CHECK(!cal.IsOff(1, D("2026-10-01")));
+  CHECK(cal.Has(2, 2026));
+  CHECK(!cal.Has(2, 2027));
+  CHECK(!cal.Has(1, 2026));
+  CHECK(cal.Country(2, 2026) == "CN");
+  CHECK(cal.LatestCountry(2) == "CN");
+  CHECK(cal.LatestCountry(1).empty());
   // 代码块前后带说明文字时也能取出 JSON
-  CHECK(ParseHolidayYear(std::string("好的，如下：\n") + text + "\n以上为官方安排。", "CN", 2026).has_value());
-  CHECK(HolidayPrompt("JP", 2027).find("Japan for the year 2027") != std::string::npos);
-  CHECK(HolidayPrompt("JP", 2027).find("JP_2027.json") != std::string::npos);
+  CHECK(ParseHolidayYear(std::string("好的，如下：\n") + text + "\n以上为官方安排。", 2026).has_value());
+  CHECK(HolidayPrompt("Japan", 2, 2027).find("Japan for the year 2027") != std::string::npos);
+  CHECK(HolidayPrompt("Japan", 2, 2027).find("config2_2027.json") != std::string::npos);
 }
 
 TaskSpec Spec(int minutes, const char* due) {
@@ -141,7 +149,7 @@ void TestTask() {
   spec.weekdays = {true, false, false, false, false, false, false};
   spec.skip_holiday = true;
   HolidayCalendar cal;
-  cal.Set({"CN", 2026, {{D("2026-11-09"), "假", true}}});
+  cal.Set({1, "中国", 2026, {{D("2026-11-09"), "假", true}}});
   Task t2 = NewTask(spec, "b001", "2026-11-02T10:00:00");
   p = ComputePlan(*Replay(t2), D("2026-11-02"), cal);
   CHECK(p.daily.size() == 2);  // 11-02、11-16（11-09 放假）
@@ -165,11 +173,17 @@ void TestTask() {
   AppendOp(t2, "resume", "2026-11-18T09:10:00");
   CHECK(Replay(t2)->status == TaskStatus::kActive);
 
-  // 校验：缺少节假日年份时拒绝
-  CHECK(ValidateSpec(Spec(60, "2027-01-10"), D("2026-11-02"), cal) == std::nullopt);
-  TaskSpec cross = Spec(60, "2027-01-10");
+  // 跳过节假日的任务可以跨入还没导入节假日的年份：没有数据时按普通工作日计算，导入后重算即可
+  CHECK(ValidateSpec(Spec(60, "2027-01-10"), D("2026-11-02")) == std::nullopt);
+  TaskSpec cross = Spec(600, "2027-01-08");
   cross.skip_holiday = true;
-  CHECK(ValidateSpec(cross, D("2026-11-02"), cal).has_value());
+  CHECK(ValidateSpec(cross, D("2026-11-02")) == std::nullopt);
+  Task tc = NewTask(cross, "c0de", "2027-01-04T09:00:00");
+  const auto sc = Replay(tc);
+  CHECK(ComputePlan(*sc, D("2027-01-04"), cal).daily.contains(D("2027-01-04")));
+  HolidayCalendar with_2027 = cal;
+  with_2027.Set({1, "中国", 2027, {{D("2027-01-04"), "假", true}}});
+  CHECK(!ComputePlan(*sc, D("2027-01-04"), with_2027).daily.contains(D("2027-01-04")));
 
   // 日志描述
   CHECK(DescribeLogEntry(t2.log.front()).starts_with("Created: "));
@@ -295,24 +309,37 @@ void TestFixed() {
 
 void TestPreference() {
   std::vector<std::string> warnings;
-  Preference p = PreferenceFromJson(Json{{"country", "JP"}, {"language", "CN"}}, warnings);
-  CHECK(p.country == "JP" && p.language == "CN" && warnings.empty());
+  Preference p = PreferenceFromJson(Json{{"holiday_config", 2}, {"language", "CN"}}, warnings);
+  CHECK(p.holiday_config == 2 && p.language == "CN" && warnings.empty());
 
-  // 不支持的国家回退为默认值并给出提示；语言文件是否存在在加载时检查
-  p = PreferenceFromJson(Json{{"country", "XX"}, {"language", "FR"}}, warnings);
-  CHECK(p.country == "CN" && p.language == "FR" && warnings.size() == 1);
+  // 不合法的节假日配置回退为默认值并给出提示；语言文件是否存在在加载时检查
+  p = PreferenceFromJson(Json{{"holiday_config", 3}, {"language", "FR"}}, warnings);
+  CHECK(p.holiday_config == 1 && p.language == "FR" && warnings.size() == 1);
 
   // 缺少字段时使用默认值（英文），不提示
   warnings.clear();
   p = PreferenceFromJson(Json::object(), warnings);
-  CHECK(p.country == "CN" && p.language == "EN" && warnings.empty());
+  CHECK(p.holiday_config == 1 && p.language == "EN" && warnings.empty());
+
+  // v1.5.0 之前保存的国家：JP 对应配置2
+  CHECK(PreferenceFromJson(Json{{"country", "JP"}}, warnings).holiday_config == 2);
+  CHECK(PreferenceFromJson(Json{{"country", "CN"}}, warnings).holiday_config == 1);
 
   // v1.3.0 写入的 zh-CN 对应 CN.json
   CHECK(PreferenceFromJson(Json{{"language", "zh-CN"}}, warnings).language == "CN");
 
   // 往返
-  p.country = "JP";
-  CHECK(PreferenceFromJson(ToJson(p), warnings).country == "JP");
+  p.holiday_config = 2;
+  CHECK(PreferenceFromJson(ToJson(p), warnings).holiday_config == 2);
+  // 农历显示：默认开，可以关闭
+  CHECK(p.show_lunar);
+  p.show_lunar = false;
+  CHECK(!PreferenceFromJson(ToJson(p), warnings).show_lunar);
+  // 标语：默认 Look Forward!，可以修改；空字符串使用默认
+  CHECK(PreferenceFromJson(Json::object(), warnings).slogan == "Look Forward!");
+  p.slogan = "加油！";
+  CHECK(PreferenceFromJson(ToJson(p), warnings).slogan == "加油！");
+  CHECK(PreferenceFromJson(Json{{"slogan", "  "}}, warnings).slogan == "Look Forward!");
 }
 
 Translations LoadLanguageFile(const char* name) {
@@ -370,9 +397,42 @@ void TestI18n() {
   f.until = D("2027-06-30");
   CHECK(RepeatText(f) == "每月 3 日 · 2026-11-03 至 2027-06-30");
   CHECK(FormatLead(90) == "1小时30分钟");
-  CHECK(HolidayPrompt("JP", 2027).find("日本2027年") != std::string::npos);
+  CHECK(HolidayPrompt("日本", 2, 2027).find("日本2027年") != std::string::npos);
+  CHECK(HolidayPrompt("日本", 2, 2027).find("config2_2027.json") != std::string::npos);
   SetTranslations({});
   CHECK(FormatLead(90) == "1 h 30 min");
+}
+
+// 旧版本的任务日志和节假日文件保存的是国家，读取时转换为节假日配置
+void TestLegacyHolidayConfig() {
+  Task t;
+  t.id = "0001";
+  t.log.push_back(Json{{"at", "2026-11-01T10:00:00"}, {"op", "create"}, {"name", "x"}, {"total_minutes", 60},
+                       {"due", "2026-11-30"}, {"weekdays", {1, 2, 3, 4, 5}}, {"skip_holiday", true}, {"country", "JP"}});
+  auto s = Replay(t);
+  CHECK(s && s->spec.holiday_config == 2);
+  CHECK(DescribeLogEntry(t.log.front()).find("Config 2") != std::string::npos);
+
+  const fs::path dir = fs::temp_directory_path() / "lfcalendar_test_holidays";
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+  CHECK(WriteTextFileAtomic(dir / "holidays" / "JP_2026.json",
+                            R"({"country":"JP","year":2026,"days":[{"date":"2026-11-03","name":"文化の日","off":true}]})")
+            .has_value());
+  Repository repo(dir);
+  std::vector<std::string> warnings;
+  const HolidayCalendar cal = repo.LoadHolidays(warnings);
+  CHECK(warnings.empty());
+  CHECK(cal.IsOff(2, D("2026-11-03")));
+  CHECK(cal.Country(2, 2026) == "日本");
+  CHECK(fs::exists(dir / "holidays" / "config2_2026.json") && !fs::exists(dir / "holidays" / "JP_2026.json"));
+
+  // 新格式：config<N>_<年>.json；年份与文件名不一致时报错
+  HolidayYear hy{1, "Deutschland", 2027, {{D("2027-10-03"), "Tag der Deutschen Einheit", true}}};
+  CHECK(repo.SaveHolidayYear(hy).has_value());
+  CHECK(fs::exists(dir / "holidays" / "config1_2027.json"));
+  CHECK(repo.LoadHolidays(warnings).Country(1, 2027) == "Deutschland");
+  fs::remove_all(dir, ec);
 }
 
 int main() {
@@ -384,6 +444,7 @@ int main() {
   TestFixed();
   TestPreference();
   TestI18n();
+  TestLegacyHolidayConfig();
   std::printf("%d/%d passed\n", g_total - g_failed, g_total);
   return g_failed == 0 ? 0 : 1;
 }

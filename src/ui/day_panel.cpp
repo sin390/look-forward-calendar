@@ -54,7 +54,9 @@ class DayPanelBase : public ComponentBase {
   Element Header() {
     const Date d = s_.selected();
     Elements lines;
-    if (const auto ld = ToLunar(d)) {
+    if (!s_.show_lunar()) {
+      lines.push_back(WrapText(s_.slogan()) | color(Color::Yellow));  // 关闭农历时，农历的位置显示标语
+    } else if (const auto ld = ToLunar(d)) {
       lines.push_back(text(Tr("Lunar: {ganzhi}{zodiac} year, {month}{day}",
                               {{"ganzhi", GanzhiYear(ld->year)}, {"zodiac", Zodiac(ld->year)},
                                {"month", LunarMonthName(*ld)}, {"day", LunarDayName(ld->day)}})));
@@ -62,11 +64,15 @@ class DayPanelBase : public ComponentBase {
       if (auto t = SolarTerm(d); !t.empty()) extra += (extra.empty() ? "" : " ") + t;
       if (!extra.empty()) lines.push_back(WrapText(extra) | color(Color::Yellow));
     }
-    for (const Country& c : SupportedCountries()) {
-      if (const HolidayDay* h = s_.holidays().Find(c.code, d))
-        lines.push_back(WrapText(h->off ? Tr("{country}: {holiday} (off)", {{"country", CountryName(c.code)}, {"holiday", h->name}})
-                                        : Tr("{country}: {holiday} (workday)", {{"country", CountryName(c.code)}, {"holiday", h->name}})) |
-                        color(h->off ? Color::Red : Color::Blue));
+    // 各节假日配置当天的节日，按“国家：假日”显示；国家取自该配置的节假日文件
+    for (int config = 1; config <= kHolidayConfigCount; ++config) {
+      const HolidayDay* h = s_.holidays().Find(config, d);
+      if (!h) continue;
+      std::string country = s_.holidays().Country(config, YearNum(d));
+      if (country.empty()) country = HolidayConfigName(config);
+      lines.push_back(WrapText(h->off ? Tr("{country}: {holiday} (off)", {{"country", country}, {"holiday", h->name}})
+                                      : Tr("{country}: {holiday} (workday)", {{"country", country}, {"holiday", h->name}})) |
+                      color(h->off ? Color::Red : Color::Blue));
     }
     return vbox(std::move(lines));
   }

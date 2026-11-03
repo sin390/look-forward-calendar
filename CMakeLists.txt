@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(LFCalendar VERSION 1.4.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
+project(LFCalendar VERSION 1.5.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -63,6 +63,8 @@ endif()
 if(MINGW)
   # 静态链接运行时，生成的 exe 可脱离 MinGW 环境直接运行
   target_link_options(LookForward PRIVATE -static)
+  # 发布版去掉符号，减小 exe 体积
+  target_link_options(LookForward PRIVATE $<$<CONFIG:Release>:-s>)
 endif()
 
 # 语言文件复制到 exe 旁边的 language/

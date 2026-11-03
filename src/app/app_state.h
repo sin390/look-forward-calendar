@@ -48,9 +48,13 @@ class AppState {
   void Select(Date d);
 
   // 配置（国家、语言）：启动和刷新时从 preference.json 读取，切换后立即保存
-  const std::string& display_country() const { return pref_.country; }
+  int display_config() const { return pref_.holiday_config; }  // 月历上显示的节假日配置
   const std::string& language() const { return pref_.language; }
-  void CycleDisplayCountry();
+  bool show_lunar() const { return pref_.show_lunar; }
+  const std::string& slogan() const { return pref_.slogan; }
+  void CycleHolidayConfig();
+  void ToggleLunar();  // 开关农历显示
+  Result SetSlogan(std::string_view slogan);  // 留空恢复默认标语
   // 按 language/ 下的 *.json 文件名顺序切换到下一个语言；语言确实改变时返回 true（界面需要重建）
   bool CycleLanguage();
   std::vector<std::string> AvailableLanguages() const;  // 如 {"CN", "EN"}
@@ -90,11 +94,12 @@ class AppState {
   Result DeleteFixed(const std::string& id);  // 删除固定日程文件（所有日期）
 
   // ---- 节假日 ----
-  Result ImportHolidays(const fs::path& file, const std::string& country, int year);
+  Result ImportHolidays(const fs::path& file, int config, int year);
 
   // ---- 状态栏消息 ----
   void Info(std::string msg);
   void Error(std::string msg);
+  // 状态栏消息；为空时状态栏显示标语
   const std::string& message() const { return message_; }
   bool message_is_error() const { return message_is_error_; }
   const std::vector<std::string>& warnings() const { return warnings_; }

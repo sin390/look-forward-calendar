@@ -13,6 +13,7 @@ AppState::AppState(fs::path data_root, fs::path language_dir)
   today_ = Today();
   selected_ = today_;
   Reload();
+  if (!message_is_error_) message_.clear();  // 启动时没有问题就不显示“已刷新”，状态栏显示标语
 }
 
 void AppState::Reload() {
@@ -56,14 +57,25 @@ void AppState::Select(Date d) {
   Touch();
 }
 
-void AppState::CycleDisplayCountry() {
-  const auto& list = SupportedCountries();
-  auto it = std::find_if(list.begin(), list.end(),
-                         [&](const Country& c) { return c.code == pref_.country; });
-  it = (it == list.end() || std::next(it) == list.end()) ? list.begin() : std::next(it);
-  pref_.country = it->code;
-  if (SavePreference()) Info(Tr("Holiday config {n}", {{"n", std::to_string(HolidayConfigNumber(pref_.country))}}));
+void AppState::CycleHolidayConfig() {
+  pref_.holiday_config = pref_.holiday_config % kHolidayConfigCount + 1;
+  if (SavePreference()) Info(HolidayConfigName(pref_.holiday_config));
   Touch();
+}
+
+void AppState::ToggleLunar() {
+  pref_.show_lunar = !pref_.show_lunar;
+  if (SavePreference()) Info(pref_.show_lunar ? Tr("Lunar calendar: on") : Tr("Lunar calendar: off"));
+  Touch();
+}
+
+Result AppState::SetSlogan(std::string_view slogan) {
+  slogan = Trim(slogan);
+  pref_.slogan = slogan.empty() ? kDefaultSlogan : std::string(slogan);
+  if (auto r = repo_.SavePreference(pref_); !r) return r;
+  message_.clear();  // 状态栏立即显示新的标语
+  Touch();
+  return {};
 }
 
 std::vector<std::string> AppState::AvailableLanguages() const {
@@ -281,7 +293,7 @@ Result AppState::CommitTask(TaskEntry& entry, Task updated) {
 }
 
 Result AppState::CreateTask(const TaskSpec& spec) {
-  if (auto err = ValidateSpec(spec, today_, holidays_)) return std::unexpected(*err);
+  if (auto err = ValidateSpec(spec, today_)) return std::unexpected(*err);
   Task task = NewTask(spec, NewId(), NowTimestamp());
   auto state = Replay(task);
   if (!state) return std::unexpected(state.error());
@@ -296,7 +308,7 @@ Result AppState::ModifyTask(const std::string& id, const TaskSpec& spec) {
   TaskEntry* entry = FindTaskMutable(id);
   if (!entry) return std::unexpected(Tr("Task not found"));
   if (entry->state.ended) return std::unexpected(Tr("The task has ended and cannot be modified"));
-  if (auto err = ValidateSpec(spec, today_, holidays_)) return std::unexpected(*err);
+  if (auto err = ValidateSpec(spec, today_)) return std::unexpected(*err);
   Task updated = entry->task;
   if (!AppendModify(updated, entry->state.spec, spec, NowTimestamp())) return {};
   return CommitTask(*entry, std::move(updated));
@@ -390,11 +402,13 @@ Result AppState::DeleteFixed(const std::string& id) {
 
 // ---------------------------------------------------------------- 节假日
 
-Result AppState::ImportHolidays(const fs::path& file, const std::string& country, int year) {
+Result AppState::ImportHolidays(const fs::path& file, int config, int year) {
+  if (!IsHolidayConfig(config)) return std::unexpected(Tr("invalid holiday_config"));
   auto text = ReadTextFile(file);
   if (!text) return std::unexpected(text.error());
-  auto hy = ParseHolidayYear(*text, country, year);
+  auto hy = ParseHolidayYear(*text, year);
   if (!hy) return std::unexpected(Tr("Format error: {error}", {{"error", hy.error()}}));
+  hy->config = config;
   if (auto r = repo_.SaveHolidayYear(*hy); !r) return r;
   holidays_.Set(std::move(*hy));
   RecomputePlans();
