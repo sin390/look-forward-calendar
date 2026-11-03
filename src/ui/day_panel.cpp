@@ -98,6 +98,12 @@ class DayPanelBase : public ComponentBase {
     }
     rows.push_back(Button("+ 新建事件 (a)", [this, d] { actions_.new_event(d); }, SmallButton()));
 
+    // ---- 固定日程 ----
+    confirm_fixed_id_.clear();
+    rows.push_back(Renderer([] { return vbox({text(""), text("【固定日程】") | bold}); }));
+    for (const FixedSchedule* f : s_.FixedOn(d)) rows.push_back(FixedRow(*f));
+    rows.push_back(Button("+ 新建固定日程 (f)", [this, d] { actions_.new_fixed(d); }, SmallButton()));
+
     // ---- 长期任务 ----
     rows.push_back(Renderer([] { return vbox({text(""), text("【任务】") | bold}); }));
     for (const TaskEntry& entry : s_.tasks()) {
@@ -121,6 +127,33 @@ class DayPanelBase : public ComponentBase {
     }
     body_ = Container::Vertical(std::move(rows), &selector_);
     Add(body_);
+  }
+
+  // 固定日程一行：时间段 + 工作内容 + [删]，下面是重复方式和备注。
+  // 删除会删掉所有日期，所以要按两次：第一次变为 [确认删除]
+  Component FixedRow(const FixedSchedule& f) {
+    const FixedSchedule copy = f;
+    auto del = Button("删", [this, id = f.id, title = f.title] {
+      if (confirm_fixed_id_ != id) {
+        confirm_fixed_id_ = id;
+        s_.Info("再按一次确认删除固定日程「" + title + "」（所有日期）");
+        return;
+      }
+      confirm_fixed_id_.clear();
+      Report(s_, s_.DeleteFixed(id), "已删除固定日程：" + title);
+    }, SmallButton());
+    return Renderer(del, [this, copy, del] {
+      Element button = del->Render();
+      if (confirm_fixed_id_ == copy.id) {
+        button = text("[确认删除]") | color(Color::Red) | bold;
+        if (del->Focused()) button |= inverted;
+      }
+      auto top = hbox({text(copy.start + "-" + copy.end) | color(Color::Cyan) | size(WIDTH, EQUAL, 12),
+                       WrapText(copy.title) | flex, button});
+      Elements lines = {top, hbox({text("  "), WrapText(RepeatText(copy)) | flex}) | dim};
+      if (!copy.note.empty()) lines.push_back(hbox({text("  "), WrapText(copy.note) | flex}) | dim);
+      return vbox(std::move(lines));
+    });
   }
 
   Component TaskRow(const TaskEntry& entry, Date d, Date today) {
@@ -185,6 +218,7 @@ class DayPanelBase : public ComponentBase {
   uint64_t built_version_ = ~uint64_t{0};
   Component body_;
   int selector_ = 0;
+  std::string confirm_fixed_id_;  // 已按过一次 [删]、等待确认的固定日程
 };
 
 }  // namespace

@@ -13,12 +13,13 @@ namespace cal::ui {
 struct DayPanelActions {
   std::function<void(Date)> new_event;
   std::function<void(Date, size_t)> edit_event;
+  std::function<void(Date)> new_fixed;
   std::function<void()> new_task;
   std::function<void(const std::string& task_id)> edit_task;
   std::function<void(const std::string& task_id, Date)> edit_progress;
 };
 
-// 选中日期的详情：事件列表、任务的计划量 / 实际量输入 / 状态按钮。
+// 选中日期的详情：事件列表、固定日程、任务的计划量 / 实际量输入 / 状态按钮。
 // 选中日期或数据变化时自动重建内部控件。
 ftxui::Component DayPanel(AppState& state, DayPanelActions actions);
 

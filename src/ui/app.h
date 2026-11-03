@@ -20,6 +20,7 @@ class App {
  private:
   AppState& state_;
   EventDialog event_dialog_;
+  FixedDialog fixed_dialog_;
   TaskDialog task_dialog_;
   ProgressDialog progress_dialog_;
   HolidayDialog holiday_dialog_;

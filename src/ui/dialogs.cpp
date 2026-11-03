@@ -39,6 +39,15 @@ std::string FormatLeadInput(int minutes) {
   return std::to_string(minutes) + "m";
 }
 
+// 星期复选框，按界面顺序（日 一 … 六）排列；weekdays 下标 0 = 周一
+Components WeekdayBoxes(std::array<bool, 7>& weekdays) {
+  static constexpr std::array<const char*, 7> kDays = {"一", "二", "三", "四", "五", "六", "日"};
+  Components boxes;
+  for (int w : kDisplayWeekOrder)
+    boxes.push_back(Checkbox(kDays[static_cast<size_t>(w - 1)], &weekdays[static_cast<size_t>(w - 1)]));
+  return boxes;
+}
+
 Element Buttons(Component ok, Component cancel) {
   return hbox({filler(), ok->Render(), text("  "), cancel->Render()});
 }
@@ -172,9 +181,7 @@ TaskDialog::TaskDialog(AppState& s) : s_(s), country_names_(CountryNames()) {
   auto name = Input(&name_, "必填", Field(&name_));
   auto total = Input(&total_, "如 40 或 12:30", Field(&total_));
   auto due = Input(&due_, "YYYY-MM-DD", Field(&due_));
-  static constexpr std::array<const char*, 7> kDays = {"一", "二", "三", "四", "五", "六", "日"};
-  Components day_boxes;
-  for (size_t i = 0; i < 7; ++i) day_boxes.push_back(Checkbox(kDays[i], &weekdays_[i]));
+  Components day_boxes = WeekdayBoxes(weekdays_);
   auto days = Container::Horizontal(day_boxes);
   auto skip = Checkbox("跳过节假日", &skip_holiday_);
   auto country = Toggle(&country_names_, &country_index_);
@@ -253,6 +260,94 @@ void TaskDialog::Submit() {
     return;
   }
   s_.Info(task_id_.empty() ? "已创建任务：" + spec.name : "已修改任务：" + spec.name);
+  Close();
+}
+
+// ---------------------------------------------------------------- FixedDialog
+
+namespace {
+constexpr std::array<Repeat, 4> kRepeats = {Repeat::kDaily, Repeat::kWeekly, Repeat::kBiweekly, Repeat::kMonthly};
+}  // namespace
+
+FixedDialog::FixedDialog(AppState& s) : s_(s) {
+  for (Repeat r : kRepeats) repeat_names_.push_back(RepeatName(r));
+  auto title = Input(&title_, "必填", Field(&title_));
+  auto start = Input(&start_, "HH:MM", Field(&start_));
+  auto end = Input(&end_, "HH:MM", Field(&end_));
+  auto repeat = Toggle(&repeat_names_, &repeat_index_);
+  Components day_boxes = WeekdayBoxes(weekdays_);
+  auto days = Container::Horizontal(day_boxes);
+  auto from = Input(&from_, "YYYY-MM-DD", Field(&from_));
+  auto until = Input(&until_, "可空：一直重复", Field(&until_));
+  auto note = Input(&note_, "", Field(&note_));
+  auto ok = Button("确定", [this] { Submit(); }, SmallButton());
+  auto cancel = Button("取消", [this] { Close(); }, SmallButton());
+  auto controls = Container::Vertical(
+      {title, start, end, repeat, days, from, until, note, Container::Horizontal({ok, cancel})});
+
+  Build("固定日程", controls, [=, this] {
+    const Repeat r = kRepeats[static_cast<size_t>(repeat_index_)];
+    const bool uses_days = r == Repeat::kWeekly || r == Repeat::kBiweekly;
+    Elements day_elems;
+    for (const Component& c : day_boxes) day_elems.push_back(c->Render() | size(WIDTH, EQUAL, 6));
+    std::string hint = "   每两周：从开始日期所在的那一周算起，隔一周一次";
+    if (r == Repeat::kMonthly) hint = "   每月：在开始日期的那一天重复，没有这一天的月份跳过";
+    if (r == Repeat::kDaily || r == Repeat::kWeekly) hint = "   保存在 data/fixed/，删除时所有日期一起删除";
+    return vbox({
+               text("新建固定日程") | dim,
+               separatorLight(),
+               FormRow("工作内容", InputBox(title, 36)),
+               FormRow("开始时间", InputBox(start, 8)),
+               FormRow("结束时间", InputBox(end, 8)),
+               FormRow("重复", repeat->Render()),
+               FormRow("星期", hbox(std::move(day_elems))) | (uses_days ? nothing : dim),
+               FormRow("开始日期", InputBox(from, 12)),
+               FormRow("结束日期", InputBox(until, 18)),
+               FormRow("备注", InputBox(note, 36)),
+               text(hint) | dim,
+               ErrorLine(),
+               separatorLight(),
+               Buttons(ok, cancel),
+           }) |
+           size(WIDTH, EQUAL, 60);
+  }, {title, start, end, repeat, days, from, until, note, ok, cancel});
+}
+
+void FixedDialog::Open(Date d) {
+  title_.clear(), start_.clear(), end_.clear(), until_.clear(), note_.clear();
+  from_ = FormatDate(d);
+  repeat_index_ = 1;  // 每周
+  weekdays_ = {};
+  weekdays_[static_cast<size_t>(IsoWeekday(d) - 1)] = true;
+  Show();
+}
+
+void FixedDialog::Submit() {
+  FixedSchedule f;
+  f.title = std::string(Trim(title_));
+  f.start = std::string(Trim(start_));
+  f.end = std::string(Trim(end_));
+  f.note = std::string(Trim(note_));
+  f.repeat = kRepeats[static_cast<size_t>(repeat_index_)];
+  f.weekdays = weekdays_;
+  const auto from = ParseDate(Trim(from_));
+  if (!from) {
+    error_ = "开始日期格式应为 YYYY-MM-DD";
+    return;
+  }
+  f.from = *from;
+  if (const std::string_view u = Trim(until_); !u.empty()) {
+    f.until = ParseDate(u);
+    if (!f.until) {
+      error_ = "结束日期格式应为 YYYY-MM-DD，或留空";
+      return;
+    }
+  }
+  if (const Result r = s_.AddFixed(f); !r) {
+    error_ = r.error();
+    return;
+  }
+  s_.Info("已添加固定日程：" + f.title + "（" + RepeatText(f) + "）");
   Close();
 }
 

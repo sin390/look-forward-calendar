@@ -78,6 +78,22 @@ class TaskDialog : public Dialog {
   std::vector<std::string> country_names_;
 };
 
+// 新建固定日程：工作内容、时间段、重复方式（默认每周）、起止日期
+class FixedDialog : public Dialog {
+ public:
+  explicit FixedDialog(AppState& s);
+  void Open(Date d);  // 以 d 为开始日期，默认每周的这一天
+
+ private:
+  void Submit();
+
+  AppState& s_;
+  std::string title_, start_, end_, from_, until_, note_;
+  int repeat_index_ = 1;
+  std::vector<std::string> repeat_names_;
+  std::array<bool, 7> weekdays_{};
+};
+
 // 填写某任务某天的实际进行情况（时长 + 内容），覆盖写入
 class ProgressDialog : public Dialog {
  public:

@@ -34,7 +34,8 @@ Element StatusBar(AppState& s, int view, int pane) {
     hints = {"↑↓/jk 选择  Enter 跳到该日期  Esc/q/m 返回"};
   else if (pane == kMonthPane)
     hints = {"移动  方向键/hjkl 选日期   [ ] 翻月   t 今天   Tab 侧边栏",
-             "功能  a 事件  n 任务  o 总览  m 提醒  i 节假日  c 国家  r 刷新  v 版本  q 退出"};
+             "功能  a 事件  f 固定日程  n 任务  o 总览  m 提醒  r 刷新  v 版本  q 退出",
+             "配置  c 国家  g 语言  i 节假日"};
   else
     hints = {"方向键/hjkl 选择  Enter 按下按钮  Tab/Esc 返回月历"};
 
@@ -52,11 +53,12 @@ Element StatusBar(AppState& s, int view, int pane) {
 }  // namespace
 
 App::App(AppState& state, std::function<void()> on_quit)
-    : state_(state), event_dialog_(state), task_dialog_(state), progress_dialog_(state), holiday_dialog_(state) {
+    : state_(state), event_dialog_(state), fixed_dialog_(state), task_dialog_(state), progress_dialog_(state), holiday_dialog_(state) {
   auto month = MonthView(state_);
   auto day = DayPanel(state_, {
                                   .new_event = [this](Date d) { event_dialog_.OpenAdd(d); },
                                   .edit_event = [this](Date d, size_t i) { event_dialog_.OpenEdit(d, i); },
+                                  .new_fixed = [this](Date d) { fixed_dialog_.Open(d); },
                                   .new_task = [this] { task_dialog_.OpenCreate(); },
                                   .edit_task = [this](const std::string& id) { task_dialog_.OpenModify(id); },
                                   .edit_progress = [this](const std::string& id, Date d) { progress_dialog_.Open(id, d); },
@@ -104,9 +106,11 @@ App::App(AppState& state, std::function<void()> on_quit)
       return true;
     }
     if (e == Event::Character('a')) event_dialog_.OpenAdd(state_.selected());
+    else if (e == Event::Character('f')) fixed_dialog_.Open(state_.selected());
     else if (e == Event::Character('n')) task_dialog_.OpenCreate();
     else if (e == Event::Character('i')) holiday_dialog_.Open();
     else if (e == Event::Character('c')) state_.CycleDisplayCountry();
+    else if (e == Event::Character('g')) state_.CycleLanguage();
     else if (e == Event::Character('r')) state_.Reload();
     else if (e == Event::Character('o')) view_ = kOverviewView;
     else if (e == Event::Character('m')) view_ = kReminderView;
@@ -116,6 +120,7 @@ App::App(AppState& state, std::function<void()> on_quit)
   });
 
   root_ |= Modal(event_dialog_.component(), event_dialog_.shown());
+  root_ |= Modal(fixed_dialog_.component(), fixed_dialog_.shown());
   root_ |= Modal(task_dialog_.component(), task_dialog_.shown());
   root_ |= Modal(progress_dialog_.component(), progress_dialog_.shown());
   root_ |= Modal(holiday_dialog_.component(), holiday_dialog_.shown());

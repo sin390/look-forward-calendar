@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(LFCalendar VERSION 1.2.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
+project(LFCalendar VERSION 1.3.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,6 +25,8 @@ add_library(calendar_core STATIC
   src/core/holiday.cpp
   src/model/day.cpp
   src/model/task.cpp
+  src/model/fixed.cpp
+  src/model/preference.cpp
   src/store/fs_util.cpp
   src/store/repository.cpp
   src/app/app_state.cpp

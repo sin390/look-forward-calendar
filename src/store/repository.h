@@ -6,6 +6,8 @@
 
 #include "core/holiday.h"
 #include "model/day.h"
+#include "model/fixed.h"
+#include "model/preference.h"
 #include "model/task.h"
 #include "store/fs_util.h"
 
@@ -14,7 +16,9 @@ namespace cal {
 // data/ 目录的读写
 //   general/<年>/<月>.json
 //   task/<创建日期>_<短id>.json
+//   fixed/<创建日期>_<短id>.json
 //   holidays/<国家>_<年>.json
+//   preference.json
 class Repository {
  public:
   explicit Repository(fs::path root);
@@ -29,6 +33,14 @@ class Repository {
   std::vector<Task> LoadTasks(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SaveTask(const Task& task) const;
   std::expected<void, std::string> DeleteTask(const Task& task) const;
+
+  std::vector<FixedSchedule> LoadFixed(std::vector<std::string>& warnings) const;
+  std::expected<void, std::string> SaveFixed(const FixedSchedule& f) const;
+  std::expected<void, std::string> DeleteFixed(const FixedSchedule& f) const;
+
+  // 文件不存在时返回默认配置
+  Preference LoadPreference(std::vector<std::string>& warnings) const;
+  std::expected<void, std::string> SavePreference(const Preference& p) const;
 
   HolidayCalendar LoadHolidays(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SaveHolidayYear(const HolidayYear& hy) const;

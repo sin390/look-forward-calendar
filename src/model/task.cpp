@@ -264,8 +264,8 @@ std::string DescribeLogEntry(const Json& e) {
 
 std::string WeekdaysText(const std::array<bool, 7>& weekdays) {
   std::string s;
-  for (size_t i = 0; i < 7; ++i)
-    if (weekdays[i]) s += kWeekdayNames[i];
+  for (int w : kDisplayWeekOrder)
+    if (weekdays[static_cast<size_t>(w - 1)]) s += kWeekdayNames[static_cast<size_t>(w - 1)];
   return s;
 }
 

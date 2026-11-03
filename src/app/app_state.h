@@ -10,6 +10,7 @@
 
 #include "core/holiday.h"
 #include "model/day.h"
+#include "model/fixed.h"
 #include "model/task.h"
 #include "store/repository.h"
 
@@ -45,8 +46,11 @@ class AppState {
   Date selected() const { return selected_; }
   void Select(Date d);
 
-  const std::string& display_country() const { return display_country_; }
+  // 配置（国家、语言）：启动和刷新时从 preference.json 读取，切换后立即保存
+  const std::string& display_country() const { return pref_.country; }
+  const std::string& language() const { return pref_.language; }
   void CycleDisplayCountry();
+  void CycleLanguage();
 
   // 数据或选中日期每次变化都会递增，UI 据此决定是否重建动态控件
   uint64_t version() const { return version_; }
@@ -75,6 +79,13 @@ class AppState {
   Result SetProgress(const std::string& id, Date d, const DayProgress& p);
   Result DeleteTask(const std::string& id);  // 删除任务文件（全部信息）
 
+  // ---- 固定日程 ----
+  const std::vector<FixedSchedule>& fixed() const { return fixed_; }
+  // 某天的固定日程，按开始时间排序。按月展开并缓存：切换到新的月份时才计算该月
+  std::vector<const FixedSchedule*> FixedOn(Date d);
+  Result AddFixed(FixedSchedule f);  // 自动分配 id 和文件名
+  Result DeleteFixed(const std::string& id);  // 删除固定日程文件（所有日期）
+
   // ---- 节假日 ----
   Result ImportHolidays(const fs::path& file, const std::string& country, int year);
 
@@ -91,7 +102,9 @@ class AppState {
   TaskEntry* FindTaskMutable(const std::string& id);
   Result CommitTask(TaskEntry& entry, Task updated);
   void RecomputePlans();
-  std::string NewTaskId() const;
+  std::string NewId() const;  // 任务和固定日程共用的短 id，互不重复
+  const std::map<Date, std::vector<size_t>>& FixedMonthOf(Date d);
+  void SavePreference();
   void Touch() { ++version_; }
 
   Repository repo_;
@@ -99,10 +112,13 @@ class AppState {
   std::vector<TaskEntry> tasks_;
   std::map<std::pair<int, unsigned>, MonthDays> months_;
   std::set<std::pair<int, unsigned>> broken_months_;  // 读取失败的月份，禁止覆盖写入
+  std::vector<FixedSchedule> fixed_;
+  // 已展开的月份：日期 → fixed_ 中的下标。固定日程增删后整体清空
+  std::map<std::pair<int, unsigned>, std::map<Date, std::vector<size_t>>> fixed_months_;
 
   Date today_{};
   Date selected_{};
-  std::string display_country_ = "CN";
+  Preference pref_;
   uint64_t version_ = 0;
 
   std::string message_;

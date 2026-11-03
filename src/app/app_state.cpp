@@ -17,7 +17,10 @@ void AppState::Reload() {
   months_.clear();
   broken_months_.clear();
   today_ = Today();
+  pref_ = repo_.LoadPreference(warnings_);
   holidays_ = repo_.LoadHolidays(warnings_);
+  fixed_ = repo_.LoadFixed(warnings_);
+  fixed_months_.clear();
 
   tasks_.clear();
   for (Task& t : repo_.LoadTasks(warnings_)) {
@@ -50,10 +53,32 @@ void AppState::Select(Date d) {
 void AppState::CycleDisplayCountry() {
   const auto& list = SupportedCountries();
   auto it = std::find_if(list.begin(), list.end(),
-                         [&](const Country& c) { return c.code == display_country_; });
+                         [&](const Country& c) { return c.code == pref_.country; });
   it = (it == list.end() || std::next(it) == list.end()) ? list.begin() : std::next(it);
-  display_country_ = it->code;
+  pref_.country = it->code;
+  SavePreference();
   Touch();
+}
+
+void AppState::CycleLanguage() {
+  const auto& list = SupportedLanguages();
+  if (list.size() <= 1) {
+    Info("目前只支持" + LanguageName(pref_.language));
+    return;
+  }
+  auto it = std::find_if(list.begin(), list.end(),
+                         [&](const Language& l) { return l.code == pref_.language; });
+  it = (it == list.end() || std::next(it) == list.end()) ? list.begin() : std::next(it);
+  pref_.language = it->code;
+  SavePreference();
+  Touch();
+}
+
+void AppState::SavePreference() {
+  if (auto r = repo_.SavePreference(pref_); !r)
+    Error("配置保存失败：" + r.error());
+  else
+    Info("已切换：国家 " + CountryName(pref_.country) + "，语言 " + LanguageName(pref_.language));
 }
 
 // ---------------------------------------------------------------- 查询
@@ -185,12 +210,14 @@ void AppState::RecomputePlans() {
   for (TaskEntry& e : tasks_) e.plan = ComputePlan(e.state, today_, holidays_);
 }
 
-std::string AppState::NewTaskId() const {
+std::string AppState::NewId() const {
   static std::mt19937 rng{std::random_device{}()};
   while (true) {
     char buf[8];
     std::snprintf(buf, sizeof buf, "%04x", static_cast<unsigned>(rng() & 0xffff));
-    if (!FindTask(buf)) return buf;
+    const bool used = FindTask(buf) || std::any_of(fixed_.begin(), fixed_.end(),
+                                                   [&](const FixedSchedule& f) { return f.id == buf; });
+    if (!used) return buf;
   }
 }
 
@@ -208,7 +235,7 @@ Result AppState::CommitTask(TaskEntry& entry, Task updated) {
 
 Result AppState::CreateTask(const TaskSpec& spec) {
   if (auto err = ValidateSpec(spec, today_, holidays_)) return std::unexpected(*err);
-  Task task = NewTask(spec, NewTaskId(), NowTimestamp());
+  Task task = NewTask(spec, NewId(), NowTimestamp());
   auto state = Replay(task);
   if (!state) return std::unexpected(state.error());
   if (auto r = repo_.SaveTask(task); !r) return r;
@@ -260,6 +287,56 @@ Result AppState::DeleteTask(const std::string& id) {
   if (it == tasks_.end()) return std::unexpected("任务不存在");
   if (auto r = repo_.DeleteTask(it->task); !r) return r;
   tasks_.erase(it);
+  Touch();
+  return {};
+}
+
+// ---------------------------------------------------------------- 固定日程
+
+const std::map<Date, std::vector<size_t>>& AppState::FixedMonthOf(Date d) {
+  const std::pair<int, unsigned> key{YearNum(d), MonthNum(d)};
+  if (auto it = fixed_months_.find(key); it != fixed_months_.end()) return it->second;
+  std::map<Date, std::vector<size_t>> month;
+  const Date first = d.year() / d.month() / std::chrono::day{1};
+  const int days = static_cast<int>(DaysInMonth(d.year() / d.month()));
+  for (int i = 0; i < days; ++i) {
+    const Date day = AddDays(first, i);
+    for (size_t k = 0; k < fixed_.size(); ++k)
+      if (OccursOn(fixed_[k], day)) month[day].push_back(k);
+  }
+  for (auto& [_, list] : month)
+    std::stable_sort(list.begin(), list.end(),
+                     [this](size_t a, size_t b) { return fixed_[a].start < fixed_[b].start; });
+  return fixed_months_[key] = std::move(month);
+}
+
+std::vector<const FixedSchedule*> AppState::FixedOn(Date d) {
+  std::vector<const FixedSchedule*> out;
+  const auto& month = FixedMonthOf(d);
+  if (const auto it = month.find(d); it != month.end())
+    for (size_t k : it->second) out.push_back(&fixed_[k]);
+  return out;
+}
+
+Result AppState::AddFixed(FixedSchedule f) {
+  if (auto err = ValidateFixed(f)) return std::unexpected(*err);
+  f.id = NewId();
+  const std::string at = NowTimestamp();
+  f.file_stem = at.substr(0, 4) + at.substr(5, 2) + at.substr(8, 2) + "_" + f.id;
+  if (auto r = repo_.SaveFixed(f); !r) return r;
+  fixed_.push_back(std::move(f));
+  fixed_months_.clear();
+  Touch();
+  return {};
+}
+
+Result AppState::DeleteFixed(const std::string& id) {
+  const auto it = std::find_if(fixed_.begin(), fixed_.end(),
+                               [&](const FixedSchedule& f) { return f.id == id; });
+  if (it == fixed_.end()) return std::unexpected("固定日程不存在");
+  if (auto r = repo_.DeleteFixed(*it); !r) return r;
+  fixed_.erase(it);
+  fixed_months_.clear();
   Touch();
   return {};
 }

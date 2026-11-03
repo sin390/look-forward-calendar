@@ -81,6 +81,52 @@ std::expected<void, std::string> Repository::DeleteTask(const Task& task) const 
   return {};
 }
 
+std::vector<FixedSchedule> Repository::LoadFixed(std::vector<std::string>& warnings) const {
+  std::vector<FixedSchedule> list;
+  for (const fs::path& p : JsonFilesIn(root_ / "fixed")) {
+    auto j = ReadJsonFile(p);
+    if (!j) {
+      warnings.push_back(j.error());
+      continue;
+    }
+    auto f = FixedFromJson(*j, PathToUtf8(p.stem()));
+    if (!f) {
+      warnings.push_back("固定日程 " + PathToUtf8(p.filename()) + "：" + f.error());
+      continue;
+    }
+    list.push_back(std::move(*f));
+  }
+  return list;
+}
+
+std::expected<void, std::string> Repository::SaveFixed(const FixedSchedule& f) const {
+  return WriteTextFileAtomic(root_ / "fixed" / PathFromUtf8(f.file_stem + ".json"), ToJson(f).dump(2));
+}
+
+std::expected<void, std::string> Repository::DeleteFixed(const FixedSchedule& f) const {
+  const fs::path p = root_ / "fixed" / PathFromUtf8(f.file_stem + ".json");
+  std::error_code ec;
+  fs::remove(p, ec);
+  if (ec) return std::unexpected("无法删除文件：" + PathToUtf8(p));
+  return {};
+}
+
+Preference Repository::LoadPreference(std::vector<std::string>& warnings) const {
+  const fs::path p = root_ / "preference.json";
+  std::error_code ec;
+  if (!fs::exists(p, ec)) return {};
+  auto j = ReadJsonFile(p);
+  if (!j) {
+    warnings.push_back(j.error() + "，已使用默认配置");
+    return {};
+  }
+  return PreferenceFromJson(*j, warnings);
+}
+
+std::expected<void, std::string> Repository::SavePreference(const Preference& p) const {
+  return WriteTextFileAtomic(root_ / "preference.json", ToJson(p).dump(2));
+}
+
 HolidayCalendar Repository::LoadHolidays(std::vector<std::string>& warnings) const {
   HolidayCalendar cal;
   for (const fs::path& p : JsonFilesIn(root_ / "holidays")) {

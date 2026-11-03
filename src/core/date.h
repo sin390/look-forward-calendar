@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <optional>
 #include <string>
@@ -19,6 +20,8 @@ Date AddDays(Date d, int n);
 Date AddMonths(Date d, int n);  // 日超出目标月天数时取月末
 int DaysBetween(Date from, Date to);  // to - from
 int IsoWeekday(Date d);               // 周一=1 … 周日=7
+// 界面上星期的显示顺序（日 一 二 … 六），元素为 IsoWeekday 的值。数据中的星期仍以周一为 1
+inline constexpr std::array<int, 7> kDisplayWeekOrder = {7, 1, 2, 3, 4, 5, 6};
 unsigned DaysInMonth(std::chrono::year_month ym);
 
 inline int YearNum(Date d) { return static_cast<int>(d.year()); }

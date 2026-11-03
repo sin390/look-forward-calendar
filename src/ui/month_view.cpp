@@ -44,16 +44,17 @@ class MonthViewBase : public ComponentBase {
     const Date sel = s_.selected();
     const std::chrono::year_month ym = sel.year() / sel.month();
     const Date first = ym / std::chrono::day{1};
-    const int lead = IsoWeekday(first) - 1;
+    const int lead = IsoWeekday(first) % 7;  // 每周从周日开始
     const int days = static_cast<int>(DaysInMonth(ym));
     const int weeks = (lead + days + 6) / 7;
 
     Elements header;
-    for (int w = 1; w <= 7; ++w) {
+    for (size_t c = 0; c < 7; ++c) {
+      const int w = kDisplayWeekOrder[c];
       auto t = CellSize(text(WeekdayName(w).substr(3)) | center);
       if (w >= 6) t |= color(Color::RedLight);
       header.push_back(t);
-      if (w < 7) header.push_back(separatorLight());
+      if (c < 6) header.push_back(separatorLight());
     }
 
     Elements rows = {hbox(std::move(header)) | bold};
@@ -104,10 +105,12 @@ class MonthViewBase : public ComponentBase {
       line2 = text("");
     }
 
-    // 第 3 行：事件数 + 任务工时（今天及以后显示计划量，过去显示实际量）
+    // 第 3 行：事件数 + 固定日程数 + 任务工时（今天及以后显示计划量，过去显示实际量）
     Element events = text("");
     if (const Day* day = s_.FindDay(d); day && !day->events.empty())
       events = text("●" + std::to_string(day->events.size())) | color(Color::Magenta);
+    if (const size_t n = s_.FixedOn(d).size(); n > 0)
+      events = hbox({events, text("◆" + std::to_string(n)) | color(Color::Cyan)});
     Element work = text("");
     if (d >= today) {
       if (const int m = s_.PlannedMinutesOn(d); m > 0) work = text("▶" + FormatMinutes(m));

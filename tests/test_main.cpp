@@ -1,11 +1,14 @@
 // 核心逻辑的单元测试（无第三方测试框架）
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "core/date.h"
 #include "core/holiday.h"
 #include "core/lunar.h"
 #include "model/day.h"
+#include "model/fixed.h"
+#include "model/preference.h"
 #include "model/task.h"
 
 using namespace cal;
@@ -208,12 +211,114 @@ void TestReminder() {
 
 }  // namespace
 
+void TestFixed() {
+  FixedSchedule f;
+  f.id = "b71c";
+  f.title = "组会";
+  f.start = "09:00";
+  f.end = "10:00";
+  f.from = D("2026-11-03");  // 周二
+  f.weekdays[1] = true;      // 周二
+  f.weekdays[3] = true;      // 周四
+  CHECK(!ValidateFixed(f));
+
+  // 每周
+  CHECK(OccursOn(f, D("2026-11-03")));
+  CHECK(OccursOn(f, D("2026-11-05")));
+  CHECK(!OccursOn(f, D("2026-11-04")));
+  CHECK(OccursOn(f, D("2026-11-10")));
+  CHECK(!OccursOn(f, D("2026-10-27")));  // 开始日期之前
+  // 开始日期所在周、开始日期之前的星期不算
+  f.weekdays[0] = true;
+  CHECK(!OccursOn(f, D("2026-11-02")));
+  f.weekdays[0] = false;
+
+  // 结束日期（含）
+  f.until = D("2026-11-10");
+  CHECK(OccursOn(f, D("2026-11-10")));
+  CHECK(!OccursOn(f, D("2026-11-12")));
+  f.until.reset();
+
+  // 每两周：以开始日期所在周为第一周
+  f.repeat = Repeat::kBiweekly;
+  CHECK(OccursOn(f, D("2026-11-05")));
+  CHECK(!OccursOn(f, D("2026-11-10")));
+  CHECK(!OccursOn(f, D("2026-11-12")));
+  CHECK(OccursOn(f, D("2026-11-17")));
+  CHECK(OccursOn(f, D("2027-01-12")));  // 跨年仍按周数计算（相隔 10 周）
+
+  // 每天
+  f.repeat = Repeat::kDaily;
+  CHECK(OccursOn(f, D("2026-11-04")));
+  CHECK(OccursOn(f, D("2026-11-08")));
+
+  // 每月：没有这一天的月份跳过
+  f.repeat = Repeat::kMonthly;
+  f.from = D("2026-10-31");
+  CHECK(OccursOn(f, D("2026-12-31")));
+  CHECK(!OccursOn(f, D("2026-11-30")));
+  CHECK(!OccursOn(f, D("2026-12-30")));
+  CHECK(RepeatText(f) == "每月 31 日 · 2026-10-31 起");
+
+  // 序列化往返
+  f.repeat = Repeat::kWeekly;
+  f.until = D("2027-06-30");
+  f.note = "带电脑";
+  auto back = FixedFromJson(ToJson(f), "20261103_b71c");
+  CHECK(back.has_value());
+  CHECK(back && back->repeat == Repeat::kWeekly && back->weekdays == f.weekdays);
+  CHECK(back && back->until == f.until && back->note == "带电脑" && back->file_stem == "20261103_b71c");
+  CHECK(RepeatText(f) == "每周二四 · 2026-10-31 至 2027-06-30");
+  // 星期按 日 一 … 六 的顺序显示
+  f.weekdays[6] = true;
+  CHECK(WeekdaysText(f.weekdays) == "日二四");
+  f.weekdays[6] = false;
+
+  // 校验
+  FixedSchedule bad = f;
+  bad.end = "08:00";
+  CHECK(ValidateFixed(bad).has_value());  // 结束早于开始
+  bad = f;
+  bad.end.clear();
+  CHECK(ValidateFixed(bad).has_value());  // 时间段必填
+  bad = f;
+  bad.weekdays = {};
+  CHECK(ValidateFixed(bad).has_value());  // 每周至少一天
+  bad.repeat = Repeat::kDaily;
+  CHECK(!ValidateFixed(bad).has_value());  // 每天不需要星期
+  bad = f;
+  bad.until = D("2026-01-01");
+  CHECK(ValidateFixed(bad).has_value());  // 结束日期早于开始日期
+}
+
+void TestPreference() {
+  std::vector<std::string> warnings;
+  Preference p = PreferenceFromJson(Json{{"country", "JP"}, {"language", "zh-CN"}}, warnings);
+  CHECK(p.country == "JP" && p.language == "zh-CN" && warnings.empty());
+
+  // 不支持的值回退为默认值并给出提示
+  p = PreferenceFromJson(Json{{"country", "XX"}, {"language", "fr"}}, warnings);
+  CHECK(p.country == "CN" && p.language == "zh-CN" && warnings.size() == 2);
+
+  // 缺少字段时使用默认值，不提示
+  warnings.clear();
+  p = PreferenceFromJson(Json::object(), warnings);
+  CHECK(p.country == "CN" && warnings.empty());
+
+  // 往返
+  p.country = "JP";
+  CHECK(PreferenceFromJson(ToJson(p), warnings).country == "JP");
+  CHECK(LanguageName("zh-CN") == "中文");
+}
+
 int main() {
   TestDate();
   TestLunar();
   TestHoliday();
   TestTask();
   TestReminder();
+  TestFixed();
+  TestPreference();
   std::printf("%d/%d passed\n", g_total - g_failed, g_total);
   return g_failed == 0 ? 0 : 1;
 }
