@@ -135,7 +135,7 @@
   "1 Active  2 All  3 Completed  ↑↓/jk select  </> scroll name  Enter view log  d delete task  Esc/q back": "1 进行中  2 全部  3 已完成  ↑↓/jk 选择  </> 滚动名称  Enter 查看日志  d 删除任务  Esc/q 返回",
   "↑↓/jk select  Enter go to date  Esc/q/m back": "↑↓/jk 选择  Enter 跳到该日期  Esc/q/m 返回",
   "Move      arrows/hjkl date   [ ] month   t today   Tab sidebar": "移动  方向键/hjkl 选日期   [ ] 翻月   t 今天   Tab 侧边栏",
-  "Actions   a event  f fixed schedule  n task  o overview  m reminders  r refresh  v version  q quit": "功能  a 事件  f 固定日程  n 任务  o 总览  m 提醒  r 刷新  v 版本  q 退出",
+  "Actions   a event  f fixed schedule  n task  o overview  m reminders  s timer  r refresh  v version  q quit": "功能  a 事件  f 固定日程  n 任务  o 总览  m 提醒  s 计时  r 刷新  v 版本  q 退出",
   "Settings  c holiday config  i import holidays  g language  u lunar calendar  e slogan": "配置  c 节假日配置  i 导入节假日  g 语言  u 农历  e 标语",
   "arrows/hjkl select  Enter press button  Tab/Esc back to calendar": "方向键/hjkl 选择  Enter 按下按钮  Tab/Esc 返回月历",
   " ⏰ Reminders: {n} (m to view) ": " ⏰ 提醒 {n} 条（m 查看） ",
@@ -301,5 +301,7 @@
   "{month}/{day}": "{month}月{day}日",
   "Slogan": "标语",
   "   Shown in the status bar when there is no other message": "   没有其他消息时显示在状态栏",
-  "   Leave empty to restore the default": "   留空恢复默认（Look Forward!）"
+  "   Leave empty to restore the default": "   留空恢复默认（Look Forward!）",
+  "Timer stopped: {n} min": "计时结束：{n} 分钟",
+  "⏱ Timer: {n} min": "⏱ 已计时 {n} 分钟"
 }

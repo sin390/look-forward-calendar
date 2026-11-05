@@ -35,15 +35,15 @@ Element StatusBar(AppState& s, int view, int pane) {
     hints = {Tr("↑↓/jk select  Enter go to date  Esc/q/m back")};
   else if (pane == kMonthPane)
     hints = {Tr("Move      arrows/hjkl date   [ ] month   t today   Tab sidebar"),
-             Tr("Actions   a event  f fixed schedule  n task  o overview  m reminders  r refresh  v version  q quit"),
+             Tr("Actions   a event  f fixed schedule  n task  o overview  m reminders  s timer  r refresh  v version  q quit"),
              Tr("Settings  c holiday config  i import holidays  g language  u lunar calendar  e slogan")};
   else
     hints = {Tr("arrows/hjkl select  Enter press button  Tab/Esc back to calendar")};
 
   Elements lines;
   for (const std::string& h : hints) lines.push_back(text(h) | dim);
-  // 没有消息时显示标语
-  auto msg = s.message().empty() ? text(s.slogan()) | color(Color::Yellow) : WrapText(s.message());
+  // 没有消息时显示标语（计时中显示计时时长）
+  auto msg = s.message().empty() ? text(s.SloganText()) | color(Color::Yellow) : WrapText(s.message());
   if (s.message_is_error()) msg |= color(Color::Red);
   Element reminder = text("");
   if (const size_t n = s.ActiveReminders(NowLocal()).size(); n > 0)
@@ -125,6 +125,7 @@ App::App(AppState& state, std::function<void()> on_quit)
     else if (e == Event::Character('o')) view_ = kOverviewView;
     else if (e == Event::Character('m')) view_ = kReminderView;
     else if (e == Event::Character('v')) about_dialog_.Open();
+    else if (e == Event::Character('s')) state_.ToggleTimer();
     else return false;  // 其余按键交给月历（方向键、hjkl、[ ]、t）
     return true;
   });
@@ -141,12 +142,19 @@ App::App(AppState& state, std::function<void()> on_quit)
 int RunApp(AppState& state) {
   auto screen = ScreenInteractive::Fullscreen();
 
-  // 每 30 秒唤醒一次界面
+  // 每 30 秒唤醒一次界面；计时中每过一分钟也唤醒一次，更新计时时长
   std::atomic<bool> running = true;
   std::thread ticker([&] {
     using namespace std::chrono_literals;
+    int shown_minutes = state.timer_minutes();
     while (running) {
-      for (int i = 0; i < 300 && running; ++i) std::this_thread::sleep_for(100ms);
+      bool wake = false;
+      for (int i = 0; i < 300 && running && !wake; ++i) {
+        std::this_thread::sleep_for(100ms);
+        const int m = state.timer_minutes();
+        wake = m != shown_minutes;
+        shown_minutes = m;
+      }
       if (running) screen.PostEvent(Event::Custom);
     }
   });

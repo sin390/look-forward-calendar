@@ -55,7 +55,7 @@ class DayPanelBase : public ComponentBase {
     const Date d = s_.selected();
     Elements lines;
     if (!s_.show_lunar()) {
-      lines.push_back(WrapText(s_.slogan()) | color(Color::Yellow));  // 关闭农历时，农历的位置显示标语
+      lines.push_back(WrapText(s_.SloganText()) | color(Color::Yellow));  // 关闭农历时，农历的位置显示标语（计时中显示计时）
     } else if (const auto ld = ToLunar(d)) {
       lines.push_back(text(Tr("Lunar: {ganzhi}{zodiac} year, {month}{day}",
                               {{"ganzhi", GanzhiYear(ld->year)}, {"zodiac", Zodiac(ld->year)},

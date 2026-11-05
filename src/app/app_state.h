@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <expected>
 #include <map>
@@ -96,6 +97,13 @@ class AppState {
   // ---- 节假日 ----
   Result ImportHolidays(const fs::path& file, int config, int year);
 
+  // ---- 计时 ----（只在内存中，不保存，不和其他功能联动）
+  void ToggleTimer();  // 开始 / 停止计时
+  bool timer_running() const { return timer_start_ms_ >= 0; }
+  int timer_minutes() const;  // 已计时的整分钟数；未计时为 -1。线程安全，供定时线程判断何时刷新
+  // 标语位置显示的文字：计时中显示计时时长，否则显示标语
+  std::string SloganText() const;
+
   // ---- 状态栏消息 ----
   void Info(std::string msg);
   void Error(std::string msg);
@@ -131,6 +139,8 @@ class AppState {
   Date selected_{};
   Preference pref_;
   uint64_t version_ = 0;
+
+  std::atomic<int64_t> timer_start_ms_{-1};  // 计时开始时刻（steady_clock 毫秒）；-1 表示未计时
 
   std::string message_;
   bool message_is_error_ = false;

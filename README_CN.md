@@ -1,4 +1,4 @@
-# LookForward Calendar（LFCalendar）v1.5.2
+# LookForward Calendar（LFCalendar）v1.6.0
 
 [English](README.md) | 中文
 
@@ -23,7 +23,7 @@ LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/
 下载 `LookForward-v<版本>-win64.zip`，解压到任意位置，双击 `LookForward.exe`（或在 Windows Terminal / PowerShell / cmd 中运行）即可，不需要安装。
 
 ```
-LookForward-v1.5.2-win64/
+LookForward-v1.6.0-win64/
   LookForward.exe        程序本体（静态链接，不需要 DLL）
   language/              语言文件：EN.json（默认）、CN.json，必须和 exe 放在一起
   README.md、README_CN.md
@@ -88,6 +88,7 @@ LookForward-v1.5.2-win64/
 | | `g` | 按 `language/` 下的语言文件切换界面语言（如 CN → EN → CN），自动保存 |
 | | `u` | 开关农历显示，自动保存（见下文） |
 | | `e` | 修改状态栏显示的标语（见下文） |
+| | `s` | 开始 / 停止计时（见下文） |
 | | `r` | 刷新（重新读取数据文件） |
 | | `v` | 版本信息 |
 | | `q` | 退出 |
@@ -190,6 +191,10 @@ LookForward-v1.5.2-win64/
 
 没有其他消息时，状态栏显示一句标语，默认为“Look Forward!”。按 `e` 修改，留空则恢复默认。标语保存在 `data/preference.json` 中，不随界面语言翻译。
 
+## 计时
+
+按 `s` 开始计时，计时期间在标语的位置（状态栏；关闭农历时还有侧边栏）显示已计时的分钟数，每分钟更新一次。再按 `s` 停止，状态栏显示总时长。计时不与其他功能联动，也不保存。
+
 ## 多语言
 
 界面上的固定文字都来自 exe 所在目录下 `language/` 中的语言文件，默认语言为英文（EN），自带中文（CN）。
@@ -230,4 +235,4 @@ data/
 
 ## 关于
 
-v1.5.2（2026-11-03）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。
+v1.6.0（2026-11-06）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。

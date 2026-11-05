@@ -1,4 +1,4 @@
-# LookForward Calendar (LFCalendar) v1.5.2
+# LookForward Calendar (LFCalendar) v1.6.0
 
 English | [中文](README_CN.md)
 
@@ -23,7 +23,7 @@ LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows b
 Download `LookForward-v<version>-win64.zip`, unzip it anywhere and double-click `LookForward.exe` (or run it from Windows Terminal / PowerShell / cmd). Nothing needs to be installed.
 
 ```
-LookForward-v1.5.2-win64/
+LookForward-v1.6.0-win64/
   LookForward.exe        the program (statically linked, no DLLs needed)
   language/              language files: EN.json (default), CN.json; must stay next to the exe
   README.md, README_CN.md
@@ -89,6 +89,7 @@ Only keys found on every keyboard are used.
 |               | `g`                     | switch the UI language to the next file in`language/` (e.g. CN → EN → CN); saved automatically |
 |               | `u`                     | show / hide the lunar calendar; saved automatically (see below)                                  |
 |               | `e`                     | edit the slogan shown in the status bar (see below)                                              |
+|               | `s`                     | start / stop the timer (see below)                                                               |
 |               | `r`                     | refresh (re-read the data files)                                                                 |
 |               | `v`                     | version information                                                                              |
 |               | `q`                     | quit                                                                                             |
@@ -194,6 +195,10 @@ The prompt follows the UI language: English with EN, Chinese with CN.
 
 When there is no other message, the status bar shows a slogan, "Look Forward!" by default. Press `e` to change it; leave it empty to restore the default. The slogan is saved in `data/preference.json` and is not translated.
 
+## Timer
+
+Press `s` to start a timer; while it runs, the elapsed time is shown in whole minutes where the slogan normally appears (status bar, and the sidebar when the lunar calendar is hidden), updated every minute. Press `s` again to stop; the status bar shows the total. The timer is independent of other features and is not saved.
+
 ## Languages
 
 All fixed UI text comes from the language files in `language/` next to the exe. The default language is English (EN); Chinese (CN) is included.
@@ -234,4 +239,4 @@ The language files are in `language/` next to the exe (not in `data/`): `EN.json
 
 ## About
 
-v1.5.2 (2026-11-03). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).
+v1.6.0 (2026-11-06). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).

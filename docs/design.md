@@ -273,7 +273,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
    The reminder period is [start − lead time, end); without an end time it ends at the start minute; an all-day event starts at 0:00 and lasts until the end of the day.
    Events in their reminder period go into the reminder list, sorted by time; the status bar shows how many. The program refreshes every 30 seconds and reloads when the date changes at midnight.
 10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
-11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.5.2, 2026-11-03; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
+11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.6.0, 2026-11-06; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
 12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
 13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`). Since v1.5.0 the official name is written "LookForward Calendar", still LFCalendar for short.
     The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create the data file; import ignores text around the code block.
@@ -314,6 +314,11 @@ language/            language files (EN.json is the template, CN.json is Chinese
     - The name column always keeps a 1-cell gap before Status, so a scrolled selected name never touches the next column.
     - Fixed: in a name slice, the empty glyph after each full-width character was output as a space, so Chinese names were twice as wide and overflowed into Status. Only a full-width character cut at the left edge is padded with a space now.
     - Fixed: pressing `3` with no completed tasks (or when every name is very short) crashed the program, because `std::clamp` got a lower bound above its upper bound.
+21. **v1.6.0 timer**: `s` on the calendar starts / stops a timer. It lives only in memory (`AppState`, so it survives a language switch), is not saved, and is independent of every other feature.
+    - While running, the slogan's place shows "⏱ Timer: N min" in whole minutes: the status bar and, with the lunar calendar off, the sidebar (`AppState::SloganText()`). Starting clears the status bar message so the timer shows at once; a later message covers it the same way it covers the slogan.
+    - Stopping shows "Timer stopped: N min" in the status bar, then the slogan returns.
+    - The start time is a `steady_clock` value in an atomic, so the ticker thread can read the elapsed minutes: besides the 30-second wake-up it wakes the UI as soon as the minute count changes.
+    - The "Actions" key hint line gains `s timer`.
 
 ## 9. Possible future work
 

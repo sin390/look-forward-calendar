@@ -1,6 +1,7 @@
 #include "app/app_state.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <random>
 
@@ -76,6 +77,36 @@ Result AppState::SetSlogan(std::string_view slogan) {
   message_.clear();  // 状态栏立即显示新的标语
   Touch();
   return {};
+}
+
+namespace {
+int64_t SteadyNowMs() {
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+}  // namespace
+
+void AppState::ToggleTimer() {
+  if (timer_running()) {
+    const int minutes = timer_minutes();
+    timer_start_ms_ = -1;
+    Info(Tr("Timer stopped: {n} min", {{"n", std::to_string(minutes)}}));
+  } else {
+    timer_start_ms_ = SteadyNowMs();
+    message_.clear();  // 标语位置立即显示计时
+  }
+  Touch();
+}
+
+int AppState::timer_minutes() const {
+  const int64_t start = timer_start_ms_;
+  if (start < 0) return -1;
+  return static_cast<int>((SteadyNowMs() - start) / 60000);
+}
+
+std::string AppState::SloganText() const {
+  if (const int n = timer_minutes(); n >= 0) return Tr("⏱ Timer: {n} min", {{"n", std::to_string(n)}});
+  return pref_.slogan;
 }
 
 std::vector<std::string> AppState::AvailableLanguages() const {
