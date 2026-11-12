@@ -1,4 +1,4 @@
-# LookForward Calendar (LFCalendar) v1.6.0
+# LookForward Calendar (LFCalendar) v1.6.1
 
 English | [中文](README_CN.md)
 
@@ -6,7 +6,7 @@ English | [中文](README_CN.md)
 
 > A sun rising over a calendar page, and one highlighted day in the date grid: looking forward to every day ahead. The same pixel data is used as the exe icon; press `v` in the program to see the terminal version.
 
-LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows built with [FTXUI](https://github.com/ArthurSonzogni/FTXUI). It shows a month view with the Chinese lunar calendar and solar terms, Chinese and Japanese public holidays, events with reminders, recurring fixed schedules, and long-term tasks whose remaining work is spread automatically over the workdays.
+LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows built with [FTXUI](https://github.com/ArthurSonzogni/FTXUI). It shows a month view with the lunar calendar and solar terms, public holidays of any country you import, events with reminders, recurring fixed schedules, and long-term tasks whose remaining work is spread automatically over the workdays.
 
 ## Features
 
@@ -16,22 +16,22 @@ LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows b
 - **Long-term tasks**: set the total hours and a due date; the remaining work is divided evenly over the workdays, you log what you actually did each day, and the plan adjusts itself
 - **Holidays**: get a country's holidays for a year from an AI and import them as local data
 - **Task overview and reminder list**: full-screen subscreens
-- **Multiple languages**: all UI text comes from language files in `language/`; English by default, Chinese included, press `g` to switch
+- **Multiple languages**: all UI text comes from language files in `language/`; English by default, Chinese and Japanese included, press `g` to switch
 
 ## Quick start (release package)
 
 Download `LookForward-v<version>-win64.zip`, unzip it anywhere and double-click `LookForward.exe` (or run it from Windows Terminal / PowerShell / cmd). Nothing needs to be installed.
 
 ```
-LookForward-v1.6.0-win64/
+LookForward-v1.6.1-win64/
   LookForward.exe        the program (statically linked, no DLLs needed)
-  language/              language files: EN.json (default), CN.json; must stay next to the exe
+  language/              language files: EN.json (default), CN.json, JA.json; must stay next to the exe
   README.md, README_CN.md
   docs/logo.png          the image used in the READMEs
 ```
 
 - On first use a `data/` folder is created next to the exe for your events, tasks, holidays and settings. To upgrade, unzip the new version and copy your old `data/` folder next to the new exe.
-- The UI starts in English; press `g` to switch to Chinese.
+- The UI starts in English; press `g` to switch to Chinese or Japanese.
 - Use a window at least 120 columns wide.
 
 ## Building and running
@@ -86,7 +86,7 @@ Only keys found on every keyboard are used.
 |               | `m`                     | reminder list                                                                                    |
 |               | `i`                     | import holidays                                                                                  |
 |               | `c`                     | switch the holidays shown on the calendar between holiday config 1 and 2; saved automatically    |
-|               | `g`                     | switch the UI language to the next file in`language/` (e.g. CN → EN → CN); saved automatically |
+|               | `g`                     | switch the UI language to the next file in`language/` (e.g. CN → EN → JA → CN); saved automatically |
 |               | `u`                     | show / hide the lunar calendar; saved automatically (see below)                                  |
 |               | `e`                     | edit the slogan shown in the status bar (see below)                                              |
 |               | `s`                     | start / stop the timer (see below)                                                               |
@@ -185,7 +185,7 @@ The program checks the format and that the year matches your choice, then saves 
 
 Holiday configs 1 and 2 are slots that are not tied to any country: you can import the holidays of any country into either one. The country is just a property of the config (the `country` field of the JSON, taken from what you entered for the prompt). It is used only by the prompt and by the sidebar, which shows a day's holidays as "country: holiday", e.g. "中国: 国庆节 (off)". When the dialog opens, the country field is filled with the country already stored for that config.
 
-The prompt follows the UI language: English with EN, Chinese with CN.
+The prompt follows the UI language: English with EN, Chinese with CN, Japanese with JA.
 
 ## Lunar calendar on/off
 
@@ -201,11 +201,11 @@ Press `s` to start a timer; while it runs, the elapsed time is shown in whole mi
 
 ## Languages
 
-All fixed UI text comes from the language files in `language/` next to the exe. The default language is English (EN); Chinese (CN) is included.
+All fixed UI text comes from the language files in `language/` next to the exe. The default language is English (EN); Chinese (CN) and Japanese (JA) are included.
 
 - `g` switches to the next language file in `language/` (in file-name order, e.g. CN → EN → CN). The change takes effect at once and is saved in `data/preference.json`, so the next start uses it too.
 - A language file is a JSON object of the form `{ "English text": "translation" }`. In `EN.json` every key equals its value; it is the template for translations.
-- **Adding a language**: copy `EN.json`, rename it to `<name>.json` (e.g. `JA.json`), translate every value, and put it in `language/`. No rebuild is needed.
+- **Adding a language**: copy `EN.json`, rename it to `<name>.json` (e.g. `FR.json`), translate every value, and put it in `language/`. No rebuild is needed.
 - `{name}` in a text is a placeholder that is replaced with a value (a date, a name, ...). Keep placeholders in the translation; you may move them, e.g. `"Task created: {name}"` → `"已创建任务：{name}"`.
 - The special key `" "` (a single space) is the separator between words, used for weekday abbreviations (`Mo We`), durations (`1 h 30 min`) and similar; Chinese translates it to an empty string.
 - The value of the key `"English"` is the language's own name ("中文" in the Chinese file); it is shown in the status bar when switching.
@@ -228,7 +228,7 @@ data/
 
 A task file records every operation as a log: create, modify, progress, pause, resume, complete, abort, each with its time.
 
-The language files are in `language/` next to the exe (not in `data/`): `EN.json`, `CN.json` and so on.
+The language files are in `language/` next to the exe (not in `data/`): `EN.json`, `CN.json`, `JA.json` and so on.
 
 ## Development
 
@@ -239,4 +239,4 @@ The language files are in `language/` next to the exe (not in `data/`): `EN.json
 
 ## About
 
-v1.6.0 (2026-11-06). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).
+v1.6.1 (2026-11-12). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).

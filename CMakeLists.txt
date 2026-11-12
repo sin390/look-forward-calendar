@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(LFCalendar VERSION 1.6.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
+project(LFCalendar VERSION 1.6.1 LANGUAGES CXX)  # 与 src/version.h 保持一致
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

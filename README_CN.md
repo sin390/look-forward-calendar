@@ -1,4 +1,4 @@
-# LookForward Calendar（LFCalendar）v1.6.0
+# LookForward Calendar（LFCalendar）v1.6.1
 
 [English](README.md) | 中文
 
@@ -6,7 +6,7 @@
 
 > 日历页上升起的太阳，和日期格里高亮的那一天：期待接下来的每一天。同一份像素数据也用作 exe 图标；程序内按 `v` 可以看到终端版。
 
-LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 的终端日历程序（Windows）。月视图日历，支持农历与节气、中国/日本节假日、带提醒的日程事件，以及按工作日自动分配工作量的长期任务。
+LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 的终端日历程序（Windows）。月视图日历，支持农历与节气、可导入任意国家的节假日、带提醒的日程事件、按周期重复的固定日程，以及按工作日自动分配工作量的长期任务。
 
 ## 功能一览
 
@@ -16,22 +16,22 @@ LookForward Calendar（简称 LFCalendar）是基于 [FTXUI](https://github.com/
 - **长期任务**：设定总时长和截止日期，程序把剩余工作量平均分配到每个工作日；每天记录实际进行情况，后续安排自动调整
 - **节假日**：通过 AI 获取指定国家、年份的节假日，导入为本地数据
 - **任务总览、提醒列表**：整屏子界面
-- **多语言**：界面文字来自 `language/` 下的语言文件，默认英文，自带中文，按 `g` 切换
+- **多语言**：界面文字来自 `language/` 下的语言文件，默认英文，自带中文和日文，按 `g` 切换
 
 ## 快速开始（发布包）
 
 下载 `LookForward-v<版本>-win64.zip`，解压到任意位置，双击 `LookForward.exe`（或在 Windows Terminal / PowerShell / cmd 中运行）即可，不需要安装。
 
 ```
-LookForward-v1.6.0-win64/
+LookForward-v1.6.1-win64/
   LookForward.exe        程序本体（静态链接，不需要 DLL）
-  language/              语言文件：EN.json（默认）、CN.json，必须和 exe 放在一起
+  language/              语言文件：EN.json（默认）、CN.json、JA.json，必须和 exe 放在一起
   README.md、README_CN.md
   docs/logo.png          README 中的图片
 ```
 
 - 首次使用时会在 exe 旁边自动生成 `data/` 目录，保存事件、任务、节假日和配置。升级时解压新版本，把旧的 `data/` 目录复制到新 exe 旁边即可。
-- 界面默认为英文，按 `g` 切换为中文。
+- 界面默认为英文，按 `g` 切换为中文或日文。
 - 建议窗口宽度在 120 列以上。
 
 ## 编译与运行
@@ -85,7 +85,7 @@ LookForward-v1.6.0-win64/
 | | `m` | 提醒列表 |
 | | `i` | 导入节假日 |
 | | `c` | 在节假日配置1 / 节假日配置2 之间切换月历上显示的节假日，自动保存 |
-| | `g` | 按 `language/` 下的语言文件切换界面语言（如 CN → EN → CN），自动保存 |
+| | `g` | 按 `language/` 下的语言文件切换界面语言（如 CN → EN → JA → CN），自动保存 |
 | | `u` | 开关农历显示，自动保存（见下文） |
 | | `e` | 修改状态栏显示的标语（见下文） |
 | | `s` | 开始 / 停止计时（见下文） |
@@ -181,7 +181,7 @@ LookForward-v1.6.0-win64/
 
 节假日配置1、2 是两个不与国家绑定的槽位，任何国家的节假日都可以导入到任一配置中。国家只是配置的一个属性（JSON 的 `country` 字段，来自生成提示词时填写的国家），只用于提示词和侧边栏：侧边栏按“国家：假日”的格式显示当天的节日，如“中国：国庆节（休）”。打开对话框时，国家一栏会自动填入该配置已有数据的国家。
 
-提示词的语言跟随界面语言：EN 时为英文，CN 时为中文。
+提示词的语言跟随界面语言：EN 时为英文，CN 时为中文，JA 时为日文。
 
 ## 农历开关
 
@@ -197,11 +197,11 @@ LookForward-v1.6.0-win64/
 
 ## 多语言
 
-界面上的固定文字都来自 exe 所在目录下 `language/` 中的语言文件，默认语言为英文（EN），自带中文（CN）。
+界面上的固定文字都来自 exe 所在目录下 `language/` 中的语言文件，默认语言为英文（EN），自带中文（CN）和日文（JA）。
 
 - 按 `g` 依次切换到 `language/` 下的下一个语言文件（按文件名排序循环，如 CN → EN → CN），立即生效并保存到 `data/preference.json`，下次启动时自动使用。
 - 语言文件是 `{ "英文原文": "译文" }` 形式的 JSON。`EN.json` 的键和值完全相同，是翻译用的模板。
-- **新增语言**：复制 `EN.json`，改名为 `<名称>.json`（如 `JA.json`），把每一条的值翻译成该语言，放进 `language/` 即可，不需要重新编译。
+- **新增语言**：复制 `EN.json`，改名为 `<名称>.json`（如 `FR.json`），把每一条的值翻译成该语言，放进 `language/` 即可，不需要重新编译。
 - 文字中的 `{name}` 是占位符，会被替换成具体内容（日期、名称等），翻译时保留占位符，位置可以调整，如 `"Task created: {name}"` → `"已创建任务：{name}"`。
 - 特殊的键 `" "`（一个空格）是词与词之间的分隔符，用于星期简称（`Mo We`）、时长（`1 h 30 min`）等，中文译为空字符串。
 - 键 `"English"` 的值是该语言自己的名称（中文文件中为“中文”），切换语言时显示在状态栏。
@@ -224,7 +224,7 @@ data/
 
 任务文件按日志方式记录每一次操作：创建、修改、进行、暂停、恢复、完成、中止，以及每次操作的时间。
 
-语言文件在 exe 所在目录下的 `language/` 中（不在 `data/` 里）：`EN.json`、`CN.json` 等。
+语言文件在 exe 所在目录下的 `language/` 中（不在 `data/` 里）：`EN.json`、`CN.json`、`JA.json` 等。
 
 ## 开发
 
@@ -235,4 +235,4 @@ data/
 
 ## 关于
 
-v1.6.0（2026-11-06）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。
+v1.6.1（2026-11-12）。本程序由 Claude（Anthropic）根据 ZXHAN 提出的需求与设计讨论编写，编写模型为 Claude Opus 5.5（claude-opus-5-5）。

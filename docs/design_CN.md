@@ -2,7 +2,7 @@
 
 [English](design.md) | 中文
 
-LookForward Calendar（LFCalendar），基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 固定日程 / 长期任务）+ 农历 + 中日节假日。
+LookForward Calendar（LFCalendar），基于 FTXUI 的终端日历：月视图 + 日程管理（瞬间型事件 / 固定日程 / 长期任务）+ 农历 + 任意国家的节假日（导入）。
 
 ## 1. 技术栈
 
@@ -251,7 +251,7 @@ tests/test_main.cpp  core / model 单元测试
 res/                 exe 图标（app.rc + LookForward.ico）
 tools/make_icon.py   由 logo.cpp 的像素数据生成 res/LookForward.ico 和 docs/logo.png
 tools/i18n.py        扫描源码中的界面文字，生成 language/EN.json，检查其他语言文件
-language/            语言文件（EN.json 为模板，CN.json 为中文）
+language/            语言文件（EN.json 为模板，CN.json 为中文，JA.json 为日文）
 ```
 
 - `calendar_core` 静态库包含 UI 以外的全部代码；`LookForward`（程序本体）与 `calendar_tests` 都链接它。
@@ -273,7 +273,7 @@ language/            语言文件（EN.json 为模板，CN.json 为中文）
    提醒期间为 [开始时间 − 提前量, 结束时间)；无结束时间则到开始那一分钟结束；全天事件以 0:00 为开始、到当天结束。
    处于提醒期间的事件进入提醒列表，按发生时间排序；主界面状态栏显示提醒条数。程序每 30 秒自动刷新一次，跨零点时自动重载。
 10. **子界面**：右侧总览栏取消，改为整屏子界面。`o` 任务总览（`1` 进行中按截止日期排序、`2` 全部按创建日期排序、`3` 已完成按最终截止日期排序），`m` 提醒列表（Enter 跳到该日期）。`Esc`/`q` 返回主界面。
-11. 界面上显示任务的地方都附带 `(ID:xxxx)`（任务总览改为单独的 ID 列，见第 19 条）。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.6.0，2026-11-06；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
+11. 界面上显示任务的地方都附带 `(ID:xxxx)`（任务总览改为单独的 ID 列，见第 19 条）。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.6.1，2026-11-12；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
 12. 任务总览中 `Enter` 查看选中任务的全部日志（按时间顺序，由 `DescribeLogEntry` 生成可读文字），`d` 删除任务文件（按 `y` 确认）。子界面自行处理返回键。
 13. **v1.2.0**：程序命名为 LookForwardCalendar（简称 LFCalendar，可执行文件 `LookForward.exe`）。v1.5.0 起正式名称写作“LookForward Calendar”，简称仍为 LFCalendar。
     节假日提示词要求 AI 把 JSON 放在 ```json 代码块中，能生成文件时同时生成数据文件；导入时忽略代码块前后的说明文字。
@@ -289,7 +289,7 @@ language/            语言文件（EN.json 为模板，CN.json 为中文）
     状态栏快捷键提示分为三行：“移动”、“功能”、“配置”（`c` 节假日配置、`i` 导入节假日、`g` 语言、`u` 农历开关、`e` 标语）。
     节假日配置是固定槽位而不是国家（见 5.1）：界面上一律称为“节假日配置1 / 2”（月历标题、状态栏、导入节假日和长期任务对话框、任务总览、任务日志描述、错误提示；`HolidayConfigName` / `HolidayConfigShortName`）。任务和 `preference.json` 保存配置编号；国家只出现在提示词和侧边栏“国家：假日”中。导入对话框有国家输入框，默认填入该配置最近一年数据的国家（`HolidayCalendar::LatestCountry`）。
 16. **v1.4.0 多语言**：程序中的固定文字都经过 `Tr()`，以英文原文作为 key；`language/<名称>.json` 是 `{ key: 译文 }` 的平面对象。
-    - 默认语言 EN；`EN.json` 的 key 与 value 相同，作为翻译模板，由 `tools/i18n.py` 从源码生成（扫描 `Tr("…")` 和 `N_("…")`）。自带 `CN.json`。
+    - 默认语言 EN；`EN.json` 的 key 与 value 相同，作为翻译模板，由 `tools/i18n.py` 从源码生成（扫描 `Tr("…")` 和 `N_("…")`）。自带 `CN.json` 和 `JA.json`（v1.6.1）。
     - 可变部分用命名占位符 `{name}`，译文可以调整语序；找不到的 key 显示英文原文。
     - 特殊 key `" "` 是词间分隔符（星期简称、时长），中文为空字符串；key `"English"` 的译文是该语言自己的名称。
     - 常量表里的文字（星期、月份、标签页）用 `N_()` 标记，使用处再 `Tr()`。
@@ -319,6 +319,7 @@ language/            语言文件（EN.json 为模板，CN.json 为中文）
     - 停止时状态栏显示“计时结束：N 分钟”，之后恢复显示标语。
     - 开始时刻是存在原子变量里的 `steady_clock` 值，定时线程可以读取已计时分钟数：除了每 30 秒唤醒一次，分钟数变化时也立即唤醒界面。
     - “功能”一行的快捷键提示增加 `s 计时`。
+22. **v1.6.1 日文**：新增 `language/JA.json`（日文界面文字和节假日提示词），不改代码。README 不再强调特定国家的节假日。
 
 ## 9. 后续可做
 

@@ -2,7 +2,7 @@
 
 English | [中文](design_CN.md)
 
-LookForward Calendar (LFCalendar), a terminal calendar built with FTXUI: month view + schedule management (events / fixed schedules / long-term tasks) + Chinese lunar calendar + Chinese and Japanese holidays.
+LookForward Calendar (LFCalendar), a terminal calendar built with FTXUI: month view + schedule management (events / fixed schedules / long-term tasks) + lunar calendar + holidays of any country (imported).
 
 ## 1. Tech stack
 
@@ -251,7 +251,7 @@ tests/test_main.cpp  core / model unit tests
 res/                 exe icon (app.rc + LookForward.ico)
 tools/make_icon.py   generates res/LookForward.ico and docs/logo.png from the pixel data in logo.cpp
 tools/i18n.py        scans the UI text in the source, generates language/EN.json, checks the other language files
-language/            language files (EN.json is the template, CN.json is Chinese)
+language/            language files (EN.json is the template, CN.json is Chinese, JA.json is Japanese)
 ```
 
 - The static library `calendar_core` contains everything except the UI; both `LookForward` (the program) and `calendar_tests` link it.
@@ -273,7 +273,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
    The reminder period is [start − lead time, end); without an end time it ends at the start minute; an all-day event starts at 0:00 and lasts until the end of the day.
    Events in their reminder period go into the reminder list, sorted by time; the status bar shows how many. The program refreshes every 30 seconds and reloads when the date changes at midnight.
 10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
-11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.6.0, 2026-11-06; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
+11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.6.1, 2026-11-12; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
 12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
 13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`). Since v1.5.0 the official name is written "LookForward Calendar", still LFCalendar for short.
     The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create the data file; import ignores text around the code block.
@@ -289,7 +289,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
     The key hints in the status bar have three lines: "Move", "Actions", "Settings" (`c` holiday config, `i` import holidays, `g` language, `u` lunar calendar on/off, `e` slogan).
     Holiday configs are fixed slots, not countries (see 5.1): the UI calls them "Holiday config 1 / 2" everywhere (calendar title, status bar, the import and task dialogs, the task overview, task log descriptions and error messages; `HolidayConfigName` / `HolidayConfigShortName`). Tasks and `preference.json` store the config number; the country appears only in the prompt and in the sidebar's "country: holiday" line. The import dialog has a country field, pre-filled from the config's latest data (`HolidayCalendar::LatestCountry`).
 16. **v1.4.0 multiple languages**: all fixed text in the program goes through `Tr()`, with the English text as the key; `language/<name>.json` is a flat `{ key: translation }` object.
-    - The default language is EN; in `EN.json` every key equals its value. It is the translation template and is generated from the source by `tools/i18n.py` (which scans `Tr("…")` and `N_("…")`). `CN.json` is included.
+    - The default language is EN; in `EN.json` every key equals its value. It is the translation template and is generated from the source by `tools/i18n.py` (which scans `Tr("…")` and `N_("…")`). `CN.json` and `JA.json` (v1.6.1) are included.
     - Variable parts use named placeholders `{name}`, so translations can reorder them; missing keys show the English text.
     - The special key `" "` is the word separator (weekday abbreviations, durations), an empty string in Chinese; the translation of the key `"English"` is the language's own name.
     - Text in constant tables (weekdays, months, tab labels) is marked with `N_()` and passed to `Tr()` where used.
@@ -319,6 +319,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
     - Stopping shows "Timer stopped: N min" in the status bar, then the slogan returns.
     - The start time is a `steady_clock` value in an atomic, so the ticker thread can read the elapsed minutes: besides the 30-second wake-up it wakes the UI as soon as the minute count changes.
     - The "Actions" key hint line gains `s timer`.
+22. **v1.6.1 Japanese**: added `language/JA.json` (Japanese UI text and holiday prompt); no code changes. The README no longer singles out particular countries' holidays.
 
 ## 9. Possible future work
 
