@@ -28,7 +28,7 @@ if [[ "${1:-}" == "package" ]]; then
   cp build-release/LookForward.exe "dist/${name}/"
   cp -r language "dist/${name}/"
   cp README.md README_CN.md "dist/${name}/"
-  cp docs/logo.png "dist/${name}/docs/"  # README 中引用的图片
+  cp docs/logo.png docs/screenshot.png docs/screenshot_CN.png "dist/${name}/docs/"  # README 中引用的图片
   # Windows 自带的 tar（bsdtar）可以生成标准 zip
   (cd dist && /c/Windows/System32/tar.exe -a -cf "${name}.zip" "${name}")
 

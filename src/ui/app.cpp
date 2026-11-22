@@ -25,7 +25,7 @@ using ftxui::Event;  // 键盘事件；数据模型的事件写作 cal::Event
 namespace {
 
 enum Pane { kMonthPane = 0, kDayPane = 1 };
-enum View { kMainView = 0, kOverviewView = 1, kReminderView = 2 };
+enum View { kMainView = 0, kOverviewView = 1, kReminderView = 2, kDiaryView = 3 };
 
 Element StatusBar(AppState& s, int view, int pane) {
   std::vector<std::string> hints;
@@ -33,9 +33,12 @@ Element StatusBar(AppState& s, int view, int pane) {
     hints = {Tr("1 Active  2 All  3 Completed  ↑↓/jk select  </> scroll name  Enter view log  d delete task  Esc/q back")};
   else if (view == kReminderView)
     hints = {Tr("↑↓/jk select  Enter go to date  Esc/q/m back")};
+  else if (view == kDiaryView)
+    hints = {Tr("←→/hl previous/next diary  [ ] month  ↑↓/jk scroll  t today  Enter/e edit  Esc/q/d back"),
+             Tr("While editing: type freely, Enter new line, Esc save and finish (an empty diary is deleted)")};
   else if (pane == kMonthPane)
     hints = {Tr("Move      arrows/hjkl date   [ ] month   t today   Tab sidebar"),
-             Tr("Actions   a event  f fixed schedule  n task  o overview  m reminders  s timer  r refresh  v version  q quit"),
+             Tr("Actions   a event  f fixed schedule  n task  d diary  o overview  m reminders  s timer  r refresh  v version  q quit"),
              Tr("Settings  c holiday config  i import holidays  g language  u lunar calendar  e slogan")};
   else
     hints = {Tr("arrows/hjkl select  Enter press button  Tab/Esc back to calendar")};
@@ -79,7 +82,11 @@ App::App(AppState& state, std::function<void()> on_quit)
         pane_ = kMonthPane;
       },
       back_to_main);
-  auto views = Container::Tab({main_view, overview, reminders}, &view_);
+  auto diary = DiaryScreen(state_, [this] {
+    view_ = kMainView;
+    pane_ = kMonthPane;
+  });
+  auto views = Container::Tab({main_view, overview, reminders, diary}, &view_);
 
   root_ = Renderer(views, [this, views] {
     return vbox({views->Render() | flex, StatusBar(state_, view_, pane_)});
@@ -124,6 +131,7 @@ App::App(AppState& state, std::function<void()> on_quit)
     else if (e == Event::Character('r')) state_.Reload();
     else if (e == Event::Character('o')) view_ = kOverviewView;
     else if (e == Event::Character('m')) view_ = kReminderView;
+    else if (e == Event::Character('d')) view_ = kDiaryView;
     else if (e == Event::Character('v')) about_dialog_.Open();
     else if (e == Event::Character('s')) state_.ToggleTimer();
     else return false;  // 其余按键交给月历（方向键、hjkl、[ ]、t）

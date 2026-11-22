@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "app/app_state.h"
 #include "core/date.h"
 #include "core/holiday.h"
 #include "core/i18n.h"
@@ -435,6 +436,36 @@ void TestLegacyHolidayConfig() {
   fs::remove_all(dir, ec);
 }
 
+// 日记：diary/<年>/<日期>.txt，空内容删除文件；前后跳转
+void TestDiary() {
+  const fs::path dir = fs::temp_directory_path() / "lfcalendar_test_diary";
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+  Repository repo(dir);
+  CHECK(repo.ListDiaryDates().empty());
+  CHECK(repo.LoadDiary(D("2026-11-22")).value() == "");
+  CHECK(repo.SaveDiary(D("2026-11-22"), "今天写了日记功能\n第二行").has_value());
+  CHECK(fs::exists(dir / "diary" / "2026" / "2026-11-22.txt"));
+  CHECK(repo.SaveDiary(D("2025-12-31"), "年末").has_value());
+  CHECK(WriteTextFileAtomic(dir / "diary" / "2026" / "notes.txt", "x").has_value());  // 不是日期，跳过
+  CHECK(WriteTextFileAtomic(dir / "diary" / "2026" / "2026-01-05.txt", "a\r\nb").has_value());
+  CHECK(repo.ListDiaryDates() == std::set<Date>({D("2025-12-31"), D("2026-01-05"), D("2026-11-22")}));
+  CHECK(repo.LoadDiary(D("2026-01-05")).value() == "a\nb");
+  CHECK(repo.LoadDiary(D("2026-11-22")).value() == "今天写了日记功能\n第二行");
+
+  AppState s(dir);
+  CHECK(s.HasDiary(D("2026-11-22")) && !s.HasDiary(D("2026-11-21")));
+  CHECK(s.PrevDiary(D("2026-11-22")) == D("2026-01-05"));
+  CHECK(s.PrevDiary(D("2026-01-05")) == D("2025-12-31"));
+  CHECK(!s.PrevDiary(D("2025-12-31")));
+  CHECK(s.NextDiary(D("2026-06-01")) == D("2026-11-22"));
+  CHECK(!s.NextDiary(D("2026-11-22")));
+  CHECK(s.SaveDiary(D("2026-11-22"), "  \n ").has_value());  // 清空即删除
+  CHECK(!s.HasDiary(D("2026-11-22")) && !fs::exists(dir / "diary" / "2026" / "2026-11-22.txt"));
+  CHECK(s.SaveDiary(D("2026-03-01"), "春").has_value() && s.HasDiary(D("2026-03-01")));
+  fs::remove_all(dir, ec);
+}
+
 int main() {
   TestDate();
   TestLunar();
@@ -445,6 +476,7 @@ int main() {
   TestPreference();
   TestI18n();
   TestLegacyHolidayConfig();
+  TestDiary();
   std::printf("%d/%d passed\n", g_total - g_failed, g_total);
   return g_failed == 0 ? 0 : 1;
 }

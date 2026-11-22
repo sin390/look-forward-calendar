@@ -1,6 +1,7 @@
 #pragma once
 
 #include <expected>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,7 @@ namespace cal {
 //   task/<创建日期>_<短id>.json
 //   fixed/<创建日期>_<短id>.json
 //   holidays/config<配置>_<年>.json
+//   diary/<年>/<YYYY-MM-DD>.txt（纯文本，UTF-8）
 //   preference.json
 class Repository {
  public:
@@ -46,7 +48,15 @@ class Repository {
   HolidayCalendar LoadHolidays(std::vector<std::string>& warnings) const;
   std::expected<void, std::string> SaveHolidayYear(const HolidayYear& hy) const;
 
+  // 日记：扫描 diary/ 得到有日记的日期（文件名不是合法日期的跳过）
+  std::set<Date> ListDiaryDates() const;
+  // 文件不存在时返回空字符串
+  std::expected<std::string, std::string> LoadDiary(Date d) const;
+  // 内容为空（只有空白）时删除文件
+  std::expected<void, std::string> SaveDiary(Date d, const std::string& text) const;
+
  private:
+  fs::path DiaryPath(Date d) const;
   fs::path MonthPath(int year, unsigned month) const;
   fs::path HolidayPath(int config, int year) const;
   void MigrateLegacyHolidays(std::vector<std::string>& warnings) const;

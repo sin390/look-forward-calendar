@@ -70,11 +70,8 @@ class MonthViewBase : public ComponentBase {
       rows.push_back(hbox(std::move(cells)));
     }
 
-    static constexpr std::array<const char*, 12> kMonths = {
-        N_("January"), N_("February"), N_("March"),     N_("April"),   N_("May"),      N_("June"),
-        N_("July"),    N_("August"),   N_("September"), N_("October"), N_("November"), N_("December")};
     const std::string title = Tr("{month_name} {year}    {config}",
-                                 {{"month_name", Tr(kMonths[MonthNum(sel) - 1])},
+                                 {{"month_name", MonthName(MonthNum(sel))},
                                   {"year", std::to_string(YearNum(sel))},
                                   {"month", std::to_string(MonthNum(sel))},
                                   {"config", HolidayConfigName(s_.display_config())}});
@@ -91,13 +88,14 @@ class MonthViewBase : public ComponentBase {
     const HolidayDay* holiday = s_.holidays().Find(s_.display_config(), d);
     const bool weekend = IsoWeekday(d) >= 6;
 
-    // 第 1 行：日期 + 休/班标记
+    // 第 1 行：日期 + 日记标记 + 休/班标记
     auto num = text(std::to_string(DayNum(d))) | bold;
     if ((holiday && holiday->off) || (weekend && !holiday)) num |= color(Color::RedLight);
     if (d == today) num = text(std::to_string(DayNum(d)) + Tr("*")) | bold | color(Color::Cyan);
+    Element diary = s_.HasDiary(d) ? text("✎") | color(Color::Yellow) : text("");
     Element mark = text("");
     if (holiday) mark = holiday->off ? text(Tr("Off")) | color(Color::Red) : text(Tr("Work")) | color(Color::Blue);
-    auto line1 = hbox({num, filler(), mark});
+    auto line1 = hbox({num, diary, filler(), mark});
 
     // 第 2 行：节假日名 > 农历节日 > 节气 > 农历日（关闭农历时只显示节假日名）
     Element line2;

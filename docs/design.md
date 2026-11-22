@@ -25,6 +25,7 @@ data/
   fixed/<created>_<id>.json      one file per fixed schedule, e.g. fixed/20261103_b71c.json
   preference.json                settings: { "holiday_config": 1, "language": "EN", "lunar": true, "slogan": "Look Forward!" }
   holidays/config<N>_<year>.json holidays of holiday config N, e.g. holidays/config1_2027.json
+  diary/<year>/<YYYY-MM-DD>.txt  one diary per day (UTF-8 plain text), e.g. diary/2026/2026-11-22.txt
 ```
 
 Language files are not user data. They live in `language/` in the exe's directory (`EN.json`, `CN.json`, ...) and are copied there from the source `language/` by CMake after each build.
@@ -233,7 +234,7 @@ src/
     preference.*   settings (holiday config, language, lunar calendar, slogan)
   store/
     fs_util.*      UTF-8 paths, atomic file writes
-    repository.*   reads and writes general/ task/ fixed/ holidays/ preference.json
+    repository.*   reads and writes general/ task/ fixed/ holidays/ diary/ preference.json
   app/
     app_state.*    application state: every change goes through here (write to disk + recompute + bump version)
   platform/
@@ -243,7 +244,7 @@ src/
     logo.*         pixel-art logo (About dialog)
     month_view.*   month grid
     day_panel.*    sidebar (events, fixed schedules and tasks of the selected day)
-    overview_screen.* / reminder_screen.*  full-screen task overview and reminder list
+    overview_screen.* / reminder_screen.* / diary_screen.*  full-screen task overview, reminder list and diary
     dialogs.*      dialog base class + event / fixed schedule / task / progress / holiday import / about
     app.*          assembly, global keys, snapshot rendering
   main.cpp
@@ -251,13 +252,14 @@ tests/test_main.cpp  core / model unit tests
 res/                 exe icon (app.rc + LookForward.ico)
 tools/make_icon.py   generates res/LookForward.ico and docs/logo.png from the pixel data in logo.cpp
 tools/i18n.py        scans the UI text in the source, generates language/EN.json, checks the other language files
+tools/screenshot.py  renders the README main-screen screenshots docs/screenshot*.png from demo data via --snapshot (needs Pillow, fontTools)
 language/            language files (EN.json is the template, CN.json is Chinese, JA.json is Japanese)
 ```
 
 - The static library `calendar_core` contains everything except the UI; both `LookForward` (the program) and `calendar_tests` link it.
 - UI extension points: a new panel is a `ComponentBase` subclass; a new dialog derives from `Dialog` (Esc to close, Tab focus order and error line built in); dynamic widgets are rebuilt lazily based on `AppState::version()`.
 - Debugging: `LookForward --data <dir> --snapshot 150x40 "n,TAB,10"` feeds the keys and prints the screen as text.
-- Release: `./build.sh package` builds the `release` preset (`build-release/`, linked with `-s`), runs the unit tests and packs `LookForward.exe`, `language/`, the READMEs and `docs/logo.png` into `dist/LookForward-v<version>-win64.zip` (the version is read from `src/version.h`). `data/` is not packed; it is created next to the exe on first use.
+- Release: `./build.sh package` builds the `release` preset (`build-release/`, linked with `-s`), runs the unit tests and packs `LookForward.exe`, `language/`, the READMEs and the images they use (`docs/logo.png`, `docs/screenshot*.png`) into `dist/LookForward-v<version>-win64.zip` (the version is read from `src/version.h`). `data/` is not packed; it is created next to the exe on first use.
 
 ## 8. Decisions
 
@@ -273,7 +275,7 @@ language/            language files (EN.json is the template, CN.json is Chinese
    The reminder period is [start − lead time, end); without an end time it ends at the start minute; an all-day event starts at 0:00 and lasts until the end of the day.
    Events in their reminder period go into the reminder list, sorted by time; the status bar shows how many. The program refreshes every 30 seconds and reloads when the date changes at midnight.
 10. **Subscreens**: the right-hand overview column was replaced by full-screen subscreens. `o` task overview (`1` active by due date, `2` all by creation date, `3` completed by final due date), `m` reminder list (Enter jumps to the date). `Esc`/`q` go back.
-11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.6.1, 2026-11-12; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
+11. Every place that shows a task also shows `(ID:xxxx)` (the task overview has a separate ID column instead, see 19). `v` opens the version information; the version is in `src/version.h` (currently v1.7.0, 2026-11-22; the About dialog shows the pixel logo and the model Claude Opus 5.5), and CMake's `project(VERSION)` matches it.
 12. In the task overview, `Enter` shows the selected task's full log (in chronological order, made readable by `DescribeLogEntry`) and `d` deletes the task file (confirm with `y`). Subscreens handle their own back keys.
 13. **v1.2.0**: the program is named LookForwardCalendar (LFCalendar for short, executable `LookForward.exe`). Since v1.5.0 the official name is written "LookForward Calendar", still LFCalendar for short.
     The holiday prompt asks the AI to put the JSON in a ```json code block and, if it can create files, to also create the data file; import ignores text around the code block.
@@ -320,6 +322,14 @@ language/            language files (EN.json is the template, CN.json is Chinese
     - The start time is a `steady_clock` value in an atomic, so the ticker thread can read the elapsed minutes: besides the 30-second wake-up it wakes the UI as soon as the minute count changes.
     - The "Actions" key hint line gains `s timer`.
 22. **v1.6.1 Japanese**: added `language/JA.json` (Japanese UI text and holiday prompt); no code changes. The README no longer singles out particular countries' holidays.
+23. **v1.7.0 diary**: `d` on the calendar opens a full-screen diary view (the sidebar is too short for writing).
+    - Storage: one UTF-8 plain-text file per day, `data/diary/<year>/<YYYY-MM-DD>.txt`, in a folder of its own so other editors can open it. `\r` is dropped when reading (CRLF files work); a diary whose text is empty (only whitespace) is deleted.
+    - `AppState` scans `diary/` at startup and on refresh and keeps only the set of days that have a diary (`std::set<Date>`); the text is read on demand. `PrevDiary` / `NextDiary` drive the jumps.
+    - Layout: the selected day's diary on the left, on the right the days of that month with a diary (in date order, current day highlighted; the selected day is listed greyed out when it has no diary). The diary's day is `AppState`'s selected day, so going back leaves the calendar on it.
+    - Keys: `←` `→` / `h` `l` previous / next diary across months (a status message when there is none), `[` `]` previous / next month (its last diary, or the 1st when it has none), `↑` `↓` / `j` `k` scroll by paragraph, `t` today; there is no key for moving one day (pick the day on the calendar and press `d` instead), `Enter` / `e` edit, `Esc` / `q` / `d` back.
+    - Editing uses FTXUI's multi-line `Input`; every key goes to it, and `Esc` saves and finishes. If saving fails the editor stays open so nothing is lost. The read-only view wraps with `WrapText`; while editing, long lines scroll sideways (`Input` does not wrap).
+    - The first line of a calendar cell shows a yellow `✎` after the day number when the day has a diary.
+    - The "Actions" key hint line gains `d diary`.
 
 ## 9. Possible future work
 

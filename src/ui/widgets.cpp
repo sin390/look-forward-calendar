@@ -82,6 +82,26 @@ std::string WeekdayShortName(int iso_weekday) {
   return Tr(kNames[static_cast<size_t>(iso_weekday - 1)]);
 }
 
+std::string MonthName(unsigned month) {
+  static constexpr std::array<const char*, 12> kMonths = {
+      N_("January"), N_("February"), N_("March"),     N_("April"),   N_("May"),      N_("June"),
+      N_("July"),    N_("August"),   N_("September"), N_("October"), N_("November"), N_("December")};
+  return Tr(kMonths[month - 1]);
+}
+
+std::string MonthShortName(unsigned month) {
+  static constexpr std::array<const char*, 12> kMonths = {N_("Jan"), N_("Feb"), N_("Mar"), N_("Apr"),
+                                                          N_("May"), N_("Jun"), N_("Jul"), N_("Aug"),
+                                                          N_("Sep"), N_("Oct"), N_("Nov"), N_("Dec")};
+  return Tr(kMonths[month - 1]);
+}
+
+std::string MonthShortTitle(Date d) {
+  return Tr("{month_name} {year}", {{"month_name", MonthShortName(MonthNum(d))},
+                                    {"year", std::to_string(YearNum(d))},
+                                    {"month", std::to_string(MonthNum(d))}});
+}
+
 std::string IdTag(const std::string& task_id) { return "(ID:" + task_id + ")"; }
 
 std::string ShortDate(Date d) {

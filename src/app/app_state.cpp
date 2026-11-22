@@ -27,6 +27,7 @@ void AppState::Reload() {
   holidays_ = repo_.LoadHolidays(warnings_);
   fixed_ = repo_.LoadFixed(warnings_);
   fixed_months_.clear();
+  diary_dates_ = repo_.ListDiaryDates();
 
   tasks_.clear();
   for (Task& t : repo_.LoadTasks(warnings_)) {
@@ -443,6 +444,33 @@ Result AppState::ImportHolidays(const fs::path& file, int config, int year) {
   if (auto r = repo_.SaveHolidayYear(*hy); !r) return r;
   holidays_.Set(std::move(*hy));
   RecomputePlans();
+  Touch();
+  return {};
+}
+
+// ---------------------------------------------------------------- 日记
+
+std::optional<Date> AppState::PrevDiary(Date d) const {
+  const auto it = diary_dates_.lower_bound(d);
+  if (it == diary_dates_.begin()) return std::nullopt;
+  return *std::prev(it);
+}
+
+std::optional<Date> AppState::NextDiary(Date d) const {
+  const auto it = diary_dates_.upper_bound(d);
+  if (it == diary_dates_.end()) return std::nullopt;
+  return *it;
+}
+
+std::expected<std::string, std::string> AppState::LoadDiary(Date d) const {
+  if (!HasDiary(d)) return std::string();
+  return repo_.LoadDiary(d);
+}
+
+Result AppState::SaveDiary(Date d, const std::string& text) {
+  if (auto r = repo_.SaveDiary(d, text); !r) return r;
+  if (Trim(text).empty()) diary_dates_.erase(d);
+  else diary_dates_.insert(d);
   Touch();
   return {};
 }

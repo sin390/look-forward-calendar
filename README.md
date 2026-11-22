@@ -1,4 +1,4 @@
-# LookForward Calendar (LFCalendar) v1.6.1
+# LookForward Calendar (LFCalendar) v1.7.0
 
 English | [中文](README_CN.md)
 
@@ -6,7 +6,9 @@ English | [中文](README_CN.md)
 
 > A sun rising over a calendar page, and one highlighted day in the date grid: looking forward to every day ahead. The same pixel data is used as the exe icon; press `v` in the program to see the terminal version.
 
-LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows built with [FTXUI](https://github.com/ArthurSonzogni/FTXUI). It shows a month view with the lunar calendar and solar terms, public holidays of any country you import, events with reminders, recurring fixed schedules, and long-term tasks whose remaining work is spread automatically over the workdays.
+LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows built with [FTXUI](https://github.com/ArthurSonzogni/FTXUI). It shows a month view with the lunar calendar and solar terms, public holidays of any country you import, events with reminders, recurring fixed schedules, long-term tasks whose remaining work is spread automatically over the workdays, and a diary.
+
+![Main screen](docs/screenshot.png)
 
 ## Features
 
@@ -15,6 +17,7 @@ LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows b
 - **Fixed schedules**: work that repeats on a cycle (weekly by default) at a fixed time, such as a meeting every Tuesday and Thursday
 - **Long-term tasks**: set the total hours and a due date; the remaining work is divided evenly over the workdays, you log what you actually did each day, and the plan adjusts itself
 - **Holidays**: get a country's holidays for a year from an AI and import them as local data
+- **Diary**: one plain-text diary per day, written in a full-screen diary view; days with a diary are marked `✎` on the calendar
 - **Task overview and reminder list**: full-screen subscreens
 - **Multiple languages**: all UI text comes from language files in `language/`; English by default, Chinese and Japanese included, press `g` to switch
 
@@ -23,14 +26,14 @@ LookForward Calendar (LFCalendar for short) is a terminal calendar for Windows b
 Download `LookForward-v<version>-win64.zip`, unzip it anywhere and double-click `LookForward.exe` (or run it from Windows Terminal / PowerShell / cmd). Nothing needs to be installed.
 
 ```
-LookForward-v1.6.1-win64/
+LookForward-v1.7.0-win64/
   LookForward.exe        the program (statically linked, no DLLs needed)
   language/              language files: EN.json (default), CN.json, JA.json; must stay next to the exe
   README.md, README_CN.md
-  docs/logo.png          the image used in the READMEs
+  docs/                  images used in the READMEs (logo, screenshots)
 ```
 
-- On first use a `data/` folder is created next to the exe for your events, tasks, holidays and settings. To upgrade, unzip the new version and copy your old `data/` folder next to the new exe.
+- On first use a `data/` folder is created next to the exe for your events, tasks, diaries, holidays and settings. To upgrade, unzip the new version and copy your old `data/` folder next to the new exe.
 - The UI starts in English; press `g` to switch to Chinese or Japanese.
 - Use a window at least 120 columns wide.
 
@@ -66,7 +69,7 @@ The result is `build/LookForward.exe`; the language files are copied to `build/l
  Key hints (Move / Actions / Settings)    ⏰ Reminders: N (m to view)
 ```
 
-Third line of a day cell: `●n` means n events that day; `◆n` means n fixed schedules; `▶h:mm` is the planned work for today and later; `✓h:mm` is the actual work on past days; a red `!` means a task is overdue.
+A yellow `✎` after the day number means the day has a diary. Third line of a day cell: `●n` means n events that day; `◆n` means n fixed schedules; `▶h:mm` is the planned work for today and later; `✓h:mm` is the actual work on past days; a red `!` means a task is overdue.
 
 ## Keys
 
@@ -82,6 +85,7 @@ Only keys found on every keyboard are used.
 |               | `a`                     | new event on the selected day                                                                    |
 |               | `f`                     | new fixed schedule starting on the selected day                                                  |
 |               | `n`                     | new long-term task                                                                               |
+|               | `d`                     | diary of the selected day (see below)                                                            |
 |               | `o`                     | task overview                                                                                    |
 |               | `m`                     | reminder list                                                                                    |
 |               | `i`                     | import holidays                                                                                  |
@@ -108,6 +112,12 @@ Only keys found on every keyboard are used.
 | Reminder list | `j` `k`                 | move up / down                                                                                   |
 |               | `Enter`                 | jump to the event's date                                                                         |
 |               | `Esc` / `q` / `m`       | back                                                                                             |
+| Diary         | `←` `→` / `h` `l`       | previous / next diary (across months)                                                            |
+|               | `[` `]`                 | previous / next month (selects that month's last diary, or the 1st if it has none)               |
+|               | `↑` `↓` / `j` `k`       | scroll a long diary                                                                              |
+|               | `t`                     | today                                                                                            |
+|               | `Enter` / `e`           | edit; while editing `Enter` starts a new line and `Esc` saves and finishes                       |
+|               | `Esc` / `q` / `d`       | back (the calendar stays on the day you were viewing)                                            |
 
 ## Events and reminders
 
@@ -199,6 +209,17 @@ When there is no other message, the status bar shows a slogan, "Look Forward!" b
 
 Press `s` to start a timer; while it runs, the elapsed time is shown in whole minutes where the slogan normally appears (status bar, and the sidebar when the lunar calendar is hidden), updated every minute. Press `s` again to stop; the status bar shows the total. The timer is independent of other features and is not saved.
 
+## Diary
+
+Press `d` on the calendar to open the diary view for the selected day. The diary text takes the whole width, with the days of that month that have a diary listed on the right (in date order; the selected day is shown greyed out if it has no diary).
+
+- `Enter` (or `e`) starts editing; type freely, `Enter` starts a new line. `Esc` saves and leaves editing. Clearing all the text and pressing `Esc` deletes that day's diary.
+- Outside editing, long lines wrap automatically. While editing, a long line scrolls sideways instead of wrapping.
+- `←` `→` go to the previous / next diary (across months); `[` `]` switch to the previous / next month; `↑` `↓` scroll a long diary.
+- To write a diary for a day that has none yet (other than today with `t`), select the day on the calendar and press `d`.
+- Each diary is a plain UTF-8 text file, `data/diary/<year>/<YYYY-MM-DD>.txt`, so you can also write it in any editor (press `r` afterwards).
+- Days with a diary get a yellow `✎` after the day number on the calendar.
+
 ## Languages
 
 All fixed UI text comes from the language files in `language/` next to the exe. The default language is English (EN); Chinese (CN) and Japanese (JA) are included.
@@ -215,7 +236,7 @@ After changing UI text in the code, run `python tools/i18n.py` to regenerate `EN
 
 ## Data files
 
-Data is stored in `data/` next to the exe; use `LookForward.exe --data <dir>` for another location. All files are UTF-8 JSON and can be viewed or edited in a text editor; press `r` in the program after editing.
+Data is stored in `data/` next to the exe; use `LookForward.exe --data <dir>` for another location. All files are UTF-8 (JSON, except the plain-text diaries) and can be viewed or edited in a text editor; press `r` in the program after editing.
 
 ```
 data/
@@ -224,6 +245,7 @@ data/
   fixed/<created>_<ID>.json      one file per fixed schedule
   preference.json                settings: holiday config shown on the calendar (1 / 2), language (language file name, e.g. "CN") whether the lunar calendar is shown, and the slogan; read at startup
   holidays/config<N>_<year>.json imported holidays of a holiday config, e.g. holidays/config1_2027.json
+  diary/<year>/<date>.txt        one plain-text diary per day, e.g. diary/2026/2026-11-22.txt
 ```
 
 A task file records every operation as a log: create, modify, progress, pause, resume, complete, abort, each with its time.
@@ -239,4 +261,4 @@ The language files are in `language/` next to the exe (not in `data/`): `EN.json
 
 ## About
 
-v1.6.1 (2026-11-12). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).
+v1.7.0 (2026-11-22). Written by Claude (Anthropic) based on requirements and design discussions with ZXHAN, using Claude Opus 5.5 (claude-opus-5-5).

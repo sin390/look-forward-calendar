@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <expected>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -97,6 +98,14 @@ class AppState {
   // ---- 节假日 ----
   Result ImportHolidays(const fs::path& file, int config, int year);
 
+  // ---- 日记 ----（diary/<年>/<日期>.txt；启动和刷新时扫描有日记的日期，内容按需读取）
+  bool HasDiary(Date d) const { return diary_dates_.contains(d); }
+  const std::set<Date>& diary_dates() const { return diary_dates_; }
+  std::optional<Date> PrevDiary(Date d) const;  // d 之前最近的有日记的日期
+  std::optional<Date> NextDiary(Date d) const;  // d 之后最近的有日记的日期
+  std::expected<std::string, std::string> LoadDiary(Date d) const;
+  Result SaveDiary(Date d, const std::string& text);  // 内容为空时删除该日记
+
   // ---- 计时 ----（只在内存中，不保存，不和其他功能联动）
   void ToggleTimer();  // 开始 / 停止计时
   bool timer_running() const { return timer_start_ms_ >= 0; }
@@ -134,6 +143,7 @@ class AppState {
   std::vector<FixedSchedule> fixed_;
   // 已展开的月份：日期 → fixed_ 中的下标。固定日程增删后整体清空
   std::map<std::pair<int, unsigned>, std::map<Date, std::vector<size_t>>> fixed_months_;
+  std::set<Date> diary_dates_;
 
   Date today_{};
   Date selected_{};

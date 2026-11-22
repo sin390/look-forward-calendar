@@ -25,6 +25,7 @@ data/
   fixed/<创建日期>_<短id>.json  每个固定日程一个文件，例：fixed/20261103_b71c.json
   preference.json               配置：{ "holiday_config": 1, "language": "EN", "lunar": true, "slogan": "Look Forward!" }
   holidays/config<配置>_<年>.json  节假日配置的节假日，例：holidays/config1_2027.json
+  diary/<年>/<YYYY-MM-DD>.txt   每天一篇日记（UTF-8 纯文本），例：diary/2026/2026-11-22.txt
 ```
 
 语言文件不属于用户数据，放在 exe 所在目录下的 `language/`（`EN.json`、`CN.json` …），由 CMake 在编译后从源码的 `language/` 复制过去。
@@ -233,7 +234,7 @@ src/
     preference.*   配置（节假日配置、语言、农历开关、标语）
   store/
     fs_util.*      UTF-8 路径、原子写文件
-    repository.*   读写 general/ task/ fixed/ holidays/ preference.json
+    repository.*   读写 general/ task/ fixed/ holidays/ diary/ preference.json
   app/
     app_state.*    应用状态：所有修改经由这里（写盘 + 重算 + version 递增）
   platform/
@@ -243,7 +244,7 @@ src/
     logo.*         像素风 logo（关于窗口）
     month_view.*   月历网格
     day_panel.*    侧边栏（选中日期的事件、固定日程与任务）
-    overview_screen.* / reminder_screen.*  整屏的任务总览与提醒列表
+    overview_screen.* / reminder_screen.* / diary_screen.*  整屏的任务总览、提醒列表与日记
     dialogs.*      对话框基类 + 事件 / 固定日程 / 任务 / 进行 / 节假日导入 / 关于
     app.*          组装、全局快捷键、快照渲染
   main.cpp
@@ -251,13 +252,14 @@ tests/test_main.cpp  core / model 单元测试
 res/                 exe 图标（app.rc + LookForward.ico）
 tools/make_icon.py   由 logo.cpp 的像素数据生成 res/LookForward.ico 和 docs/logo.png
 tools/i18n.py        扫描源码中的界面文字，生成 language/EN.json，检查其他语言文件
+tools/screenshot.py  用演示数据和 --snapshot 生成 README 的主界面截图 docs/screenshot*.png（需要 Pillow、fontTools）
 language/            语言文件（EN.json 为模板，CN.json 为中文，JA.json 为日文）
 ```
 
 - `calendar_core` 静态库包含 UI 以外的全部代码；`LookForward`（程序本体）与 `calendar_tests` 都链接它。
 - UI 的扩展点：新面板实现为 `ComponentBase` 子类；新对话框继承 `Dialog`（自带 Esc 关闭、Tab 焦点顺序、错误行）；动态控件按 `AppState::version()` 惰性重建。
 - 开发调试：`LookForward --data <目录> --snapshot 150x40 "n,TAB,10"` 依次送入按键后，把界面渲染为文本输出。
-- 发布：`./build.sh package` 用 `release` 预设编译（`build-release/`，链接时加 `-s`），运行单元测试，把 `LookForward.exe`、`language/`、README 和 `docs/logo.png` 打包为 `dist/LookForward-v<版本>-win64.zip`（版本号读自 `src/version.h`）。`data/` 不打包，首次使用时在 exe 旁边自动生成。
+- 发布：`./build.sh package` 用 `release` 预设编译（`build-release/`，链接时加 `-s`），运行单元测试，把 `LookForward.exe`、`language/`、README 和 README 引用的图片（`docs/logo.png`、`docs/screenshot*.png`）打包为 `dist/LookForward-v<版本>-win64.zip`（版本号读自 `src/version.h`）。`data/` 不打包，首次使用时在 exe 旁边自动生成。
 
 ## 8. 已确定的决定
 
@@ -273,7 +275,7 @@ language/            语言文件（EN.json 为模板，CN.json 为中文，JA.j
    提醒期间为 [开始时间 − 提前量, 结束时间)；无结束时间则到开始那一分钟结束；全天事件以 0:00 为开始、到当天结束。
    处于提醒期间的事件进入提醒列表，按发生时间排序；主界面状态栏显示提醒条数。程序每 30 秒自动刷新一次，跨零点时自动重载。
 10. **子界面**：右侧总览栏取消，改为整屏子界面。`o` 任务总览（`1` 进行中按截止日期排序、`2` 全部按创建日期排序、`3` 已完成按最终截止日期排序），`m` 提醒列表（Enter 跳到该日期）。`Esc`/`q` 返回主界面。
-11. 界面上显示任务的地方都附带 `(ID:xxxx)`（任务总览改为单独的 ID 列，见第 19 条）。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.6.1，2026-11-12；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
+11. 界面上显示任务的地方都附带 `(ID:xxxx)`（任务总览改为单独的 ID 列，见第 19 条）。`v` 打开版本信息；版本号写在 `src/version.h`（当前 v1.7.0，2026-11-22；关于窗口显示像素 logo 和编写模型 Claude Opus 5.5），CMake 的 `project(VERSION)` 与之保持一致。
 12. 任务总览中 `Enter` 查看选中任务的全部日志（按时间顺序，由 `DescribeLogEntry` 生成可读文字），`d` 删除任务文件（按 `y` 确认）。子界面自行处理返回键。
 13. **v1.2.0**：程序命名为 LookForwardCalendar（简称 LFCalendar，可执行文件 `LookForward.exe`）。v1.5.0 起正式名称写作“LookForward Calendar”，简称仍为 LFCalendar。
     节假日提示词要求 AI 把 JSON 放在 ```json 代码块中，能生成文件时同时生成数据文件；导入时忽略代码块前后的说明文字。
@@ -320,6 +322,14 @@ language/            语言文件（EN.json 为模板，CN.json 为中文，JA.j
     - 开始时刻是存在原子变量里的 `steady_clock` 值，定时线程可以读取已计时分钟数：除了每 30 秒唤醒一次，分钟数变化时也立即唤醒界面。
     - “功能”一行的快捷键提示增加 `s 计时`。
 22. **v1.6.1 日文**：新增 `language/JA.json`（日文界面文字和节假日提示词），不改代码。README 不再强调特定国家的节假日。
+23. **v1.7.0 日记**：月历中按 `d` 进入整屏的日记界面（侧边栏太短，不适合写日记）。
+    - 存储：每天一个 UTF-8 纯文本文件 `data/diary/<年>/<YYYY-MM-DD>.txt`，单独成目录，方便用其他编辑器查看。读取时去掉 `\r`（兼容 CRLF）；内容为空（只有空白）时删除文件。
+    - `AppState` 在启动和刷新时扫描 `diary/`，只记住有日记的日期（`std::set<Date>`），正文按需读取。`PrevDiary` / `NextDiary` 用于跳转。
+    - 界面：左侧是选中日期的日记，右侧列出这个月有日记的日期（按日期排列，当前日期高亮；选中的日期没有日记时也以灰色列出）。日记界面的日期就是 `AppState` 的选中日期，返回月历时停在这一天。
+    - 按键：`←` `→` / `h` `l` 跨月切换到上一篇 / 下一篇日记（没有时状态栏提示），`[` `]` 上个月 / 下个月（选中该月最后一篇日记，没有日记时选中 1 日），`↑` `↓` / `j` `k` 按段落滚动，`t` 今天；不提供逐日移动（在月历上选中日期再按 `d`），`Enter` / `e` 编辑，`Esc` / `q` / `d` 返回。
+    - 编辑用 FTXUI 的多行 `Input`，所有按键交给输入框，`Esc` 保存并结束编辑；保存失败时停留在编辑状态，不丢内容。只读显示用 `WrapText` 自动换行，编辑时长行横向滚动（`Input` 不支持自动换行）。
+    - 月历格子第一行在日期数字后面用黄色 `✎` 标出有日记的日期。
+    - “功能”一行的快捷键提示增加 `d 日记`。
 
 ## 9. 后续可做
 

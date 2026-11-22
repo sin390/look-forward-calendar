@@ -31,6 +31,9 @@ ftxui::Element WrapText(std::string_view s);
 
 std::string WeekdayName(int iso_weekday);       // 1 -> "Mon"（中文：周一）
 std::string WeekdayShortName(int iso_weekday);  // 1 -> "Mo"（中文：一）
+std::string MonthName(unsigned month);          // 1 -> "January"（中文：一月）
+std::string MonthShortName(unsigned month);     // 1 -> "Jan"（中文：一月）
+std::string MonthShortTitle(Date d);            // "Nov 2026"（中文：2026 年 11 月）
 std::string IdTag(const std::string& task_id);  // "(ID:a3f9)"
 std::string ShortDate(Date d);             // "11/2"（中文：11月2日）
 

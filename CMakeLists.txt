@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(LFCalendar VERSION 1.6.1 LANGUAGES CXX)  # 与 src/version.h 保持一致
+project(LFCalendar VERSION 1.7.0 LANGUAGES CXX)  # 与 src/version.h 保持一致
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +43,7 @@ add_executable(LookForward
   src/ui/day_panel.cpp
   src/ui/overview_screen.cpp
   src/ui/reminder_screen.cpp
+  src/ui/diary_screen.cpp
   src/ui/dialogs.cpp
   src/ui/widgets.cpp
   src/ui/logo.cpp

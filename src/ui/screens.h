@@ -18,4 +18,8 @@ ftxui::Component OverviewScreen(AppState& state, std::function<void()> on_back);
 ftxui::Component ReminderScreen(AppState& state, std::function<void(Date)> jump_to,
                                 std::function<void()> on_back);
 
+// 日记：显示 / 编辑选中日期的日记，右侧列出该月有日记的日期。
+// ←→ 上一篇 / 下一篇日记（可跨月），[ ] 切换月份，↑↓ 滚动正文，Enter 编辑，编辑中 Esc 保存
+ftxui::Component DiaryScreen(AppState& state, std::function<void()> on_back);
+
 }  // namespace cal::ui

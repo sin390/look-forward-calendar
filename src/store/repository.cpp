@@ -208,4 +208,45 @@ std::expected<void, std::string> Repository::SaveHolidayYear(const HolidayYear& 
   return WriteTextFileAtomic(HolidayPath(hy.config, hy.year), ToJson(hy).dump(2));
 }
 
+// ---------------------------------------------------------------- 日记
+
+fs::path Repository::DiaryPath(Date d) const {
+  return root_ / "diary" / std::to_string(YearNum(d)) / (FormatDate(d) + ".txt");
+}
+
+std::set<Date> Repository::ListDiaryDates() const {
+  std::set<Date> dates;
+  std::error_code ec;
+  for (const auto& year : fs::directory_iterator(root_ / "diary", ec)) {
+    if (!year.is_directory()) continue;
+    std::error_code ec2;
+    for (const auto& entry : fs::directory_iterator(year.path(), ec2)) {
+      if (!entry.is_regular_file() || entry.path().extension() != ".txt") continue;
+      if (const auto d = ParseDate(PathToUtf8(entry.path().stem()))) dates.insert(*d);
+    }
+  }
+  return dates;
+}
+
+std::expected<std::string, std::string> Repository::LoadDiary(Date d) const {
+  const fs::path p = DiaryPath(d);
+  std::error_code ec;
+  if (!fs::exists(p, ec)) return std::string();
+  auto text = ReadTextFile(p);
+  if (!text) return text;
+  std::erase(*text, '\r');  // 用其他编辑器保存的 CRLF 换行
+  return text;
+}
+
+std::expected<void, std::string> Repository::SaveDiary(Date d, const std::string& text) const {
+  const fs::path p = DiaryPath(d);
+  if (Trim(text).empty()) {
+    std::error_code ec;
+    fs::remove(p, ec);
+    if (ec) return std::unexpected(Tr("Cannot delete file: {path}", {{"path", PathToUtf8(p)}}));
+    return {};
+  }
+  return WriteTextFileAtomic(p, text);
+}
+
 }  // namespace cal
